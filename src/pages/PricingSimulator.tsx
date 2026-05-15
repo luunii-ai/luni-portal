@@ -11,6 +11,8 @@ const DEFAULTS_BY_PROCEDURE: Record<string, { estimatedUnits: number; costPerUni
   jawline: { estimatedUnits: 3, costPerUnit: 260 },
   'cheek-filler': { estimatedUnits: 2, costPerUnit: 240 },
   nose: { estimatedUnits: 1, costPerUnit: 260 },
+  'bigode-chines': { estimatedUnits: 2, costPerUnit: 240 },
+  mento: { estimatedUnits: 1, costPerUnit: 260 },
 };
 const DEFAULT_BOTOX_VIAL_PRICE = 600;
 const DEFAULT_BOTOX_POINTS_PER_VIAL = 100;
@@ -28,6 +30,8 @@ const DEFAULT_ADDITIONAL_COSTS_BY_PROCEDURE: Record<string, AdditionalCosts> = {
   jawline: { supplies: 15, ppeAndHygiene: 8, cardFee: 30, fixedClinicShare: 70 },
   'cheek-filler': { supplies: 15, ppeAndHygiene: 8, cardFee: 25, fixedClinicShare: 60 },
   nose: { supplies: 12, ppeAndHygiene: 8, cardFee: 20, fixedClinicShare: 60 },
+  'bigode-chines': { supplies: 15, ppeAndHygiene: 8, cardFee: 25, fixedClinicShare: 60 },
+  mento: { supplies: 12, ppeAndHygiene: 8, cardFee: 25, fixedClinicShare: 60 },
 };
 
 const getDefaultAdditionalCosts = (procedureId: string): AdditionalCosts =>

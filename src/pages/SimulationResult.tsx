@@ -101,7 +101,7 @@ type ResultLocationState = {
     phone?: string;
     email?: string;
   };
-  /** Detalhes / resultado desejado (fluxo cirurgião). */
+  /** Detalhes / resultado desejado opcionais vindos do fluxo de simulação. */
   detalhes?: string;
 };
 
@@ -154,14 +154,16 @@ const SimulationResult = () => {
     queryFn: () => fetchPricingBase(primaryProcedureId),
     enabled: Boolean(primaryProcedureId),
   });
-  const proc: Procedure | undefined =
-    procedures.find((p) => p.id === primaryProcedureId) ?? procedures.find((p) => p.id === 'botox');
+  const proc: Procedure | undefined = procedures.find((p) => p.id === primaryProcedureId);
 
   const procedureNamesLabel =
     procedureIds
       .map((id) => procedures.find((p) => p.id === id)?.name ?? plasticProcedureDisplayName(id))
       .filter(Boolean)
-      .join(' · ') || proc?.name || 'Botox';
+      .join(' · ') ||
+    proc?.name ||
+    plasticProcedureDisplayName(primaryProcedureId) ||
+    'Procedimento';
   const defaultPoints = Math.max(proc?.defaultPoints || 0, 20);
   const effectiveCostPerPoint = proc?.costPerPoint && proc.costPerPoint > 0 ? proc.costPerPoint : 15;
   const effectivePricePerPoint = proc?.pricePerPoint && proc.pricePerPoint > 0 ? proc.pricePerPoint : 45;
@@ -253,8 +255,12 @@ const SimulationResult = () => {
         patientName: (draft.name || '').trim(),
         patientPhone: phoneForApi || undefined,
         patientEmail: (draft.email ?? '').trim() || undefined,
-        procedure: procedureNamesLabel || proc?.name || 'Botox (Toxina Botulínica)',
-        procedureId: proc?.id || primaryProcedureId,
+        procedure:
+          procedureNamesLabel ||
+          proc?.name ||
+          plasticProcedureDisplayName(primaryProcedureId) ||
+          'Procedimento',
+        procedureId: primaryProcedureId,
         date: new Date().toISOString(),
         intensity: intensityShown,
         points: pointsForFinance,

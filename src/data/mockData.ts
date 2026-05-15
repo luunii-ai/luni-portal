@@ -38,6 +38,8 @@ export interface Procedure {
   defaultPoints: number;
   costPerPoint: number;
   pricePerPoint: number;
+  /** Escopo no catálogo do back-end (clínica vs cirurgião); ausente em respostas antigas. */
+  practiceProfileScope?: 'clinic' | 'surgeon';
 }
 
 export const botoxFacialPoints = [

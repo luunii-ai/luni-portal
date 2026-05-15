@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import patientAfter from '@/assets/patient-after.jpg';
+import { resolveSimulationProcedureId } from '@/lib/resolveSimulationProcedureId';
 
 const dayOnlyTs = (iso: string) => {
   const d = new Date(iso);
@@ -65,10 +66,8 @@ const History = () => {
     return list;
   }, [allSimulations, filterProcedure, dateFrom, dateTo]);
 
-  const getProcedureId = (procedureName: string, procedureId?: string) => {
-    if (procedureId) return procedureId;
-    return procedures.find((p) => p.name === procedureName)?.id || 'botox';
-  };
+  const getProcedureId = (procedureName: string, procedureId?: string) =>
+    resolveSimulationProcedureId(procedureName, procedures, procedureId);
 
   const clearDates = () => {
     setDateFrom('');
@@ -196,7 +195,9 @@ const History = () => {
             Nenhuma simulação encontrada com esses filtros.
           </p>
         )}
-        {filtered.map((sim) => (
+        {filtered.map((sim) => {
+          const resolvedProcedureId = getProcedureId(sim.procedure, sim.procedureId);
+          return (
           <div
             key={sim.id}
             className="ds-feature-card group relative w-full max-w-[20.5rem] overflow-hidden shadow-card ds-transition-surface hover:border-primary/30 hover:shadow-elevated sm:max-w-[16rem]"
@@ -208,8 +209,8 @@ const History = () => {
                   : '/resultado-simulacao'
               }
               state={{
-                procedure: getProcedureId(sim.procedure, sim.procedureId),
-                procedures: sim.procedureId ? [sim.procedureId] : undefined,
+                procedure: resolvedProcedureId,
+                procedures: [resolvedProcedureId],
                 intensity: sim.intensity,
                 image: sim.image,
                 activePointIds: sim.activePointIds,
@@ -275,7 +276,8 @@ const History = () => {
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <AlertDialog open={Boolean(simToDelete)} onOpenChange={(open) => !open && setSimToDelete(null)}>

@@ -38,7 +38,7 @@ const NewSimulation = () => {
   const [selectedProcedures, setSelectedProcedures] = useState<string[]>([]);
   const [mammoplastiaSiliconeAck, setMammoplastiaSiliconeAck] = useState(false);
   const [regioes, setRegioes] = useState('');
-  const [detalhesCirurgia, setDetalhesCirurgia] = useState('');
+  const [detalhesResultado, setDetalhesResultado] = useState('');
   const [intensity, setIntensity] = useState(50);
   const [isGenerating, setIsGenerating] = useState(false);
   const [patientMode, setPatientMode] = useState<PatientMode>('new');
@@ -54,9 +54,14 @@ const NewSimulation = () => {
     if (flowLocked) setStep(1);
   }, [flowLocked]);
 
-  const { data: procedures = [] } = useQuery({
-    queryKey: ['procedures'],
-    queryFn: fetchProcedures,
+  const {
+    data: clinicProcedures = [],
+    isPending: loadingClinicProcedures,
+    isError: clinicProceduresError,
+  } = useQuery({
+    queryKey: ['procedures', 'clinic'],
+    queryFn: () => fetchProcedures('clinic'),
+    enabled: practiceProfile === 'clinic',
   });
 
   const { data: allPatients = [], isLoading: loadingPatients } = useQuery({
@@ -197,16 +202,6 @@ const NewSimulation = () => {
       return;
     }
 
-    if (practiceProfile === 'surgeon' && !detalhesCirurgia.trim()) {
-      toast({
-        title: 'Detalhes obrigatórios',
-        description:
-          'Descreva o resultado desejado (passo Regiões) para o perfil cirurgião plástico.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     if (!hasSimulationCredit) {
       toast({
         title: 'Simulações esgotadas',
@@ -224,8 +219,7 @@ const NewSimulation = () => {
         regioes: regioes.trim(),
         intensidade: intensityPercentToApiLabel(intensity),
         practiceProfile: practiceProfile ?? 'clinic',
-        detalhes:
-          practiceProfile === 'surgeon' ? detalhesCirurgia.trim() : undefined,
+        detalhes: detalhesResultado.trim() || undefined,
       });
 
       const storedOk = storeEnhanceAfterImage(result.afterDataUrl);
@@ -258,9 +252,7 @@ const NewSimulation = () => {
         ...(storedOk ? {} : { afterImage: result.afterDataUrl }),
         // Sem pairId as fotos vêm só do state; com pairId evitamos base64 em history.state (limite do browser).
         ...(result.pairId ? {} : { image: uploadedImage ?? undefined }),
-        ...(practiceProfile === 'surgeon' && detalhesCirurgia.trim()
-          ? { detalhes: detalhesCirurgia.trim() }
-          : {}),
+        ...(detalhesResultado.trim() ? { detalhes: detalhesResultado.trim() } : {}),
       };
       persistSimulationFlow(flowSnapshot);
       void refreshMe();
@@ -292,9 +284,7 @@ const NewSimulation = () => {
             phone: phoneDigits,
             email: patientEmail.trim(),
           },
-          ...(practiceProfile === 'surgeon' && detalhesCirurgia.trim()
-            ? { detalhes: detalhesCirurgia.trim() }
-            : {}),
+          ...(detalhesResultado.trim() ? { detalhes: detalhesResultado.trim() } : {}),
         },
       });
     } catch (err) {
@@ -320,7 +310,9 @@ const NewSimulation = () => {
     setStep(1);
     setSelectedProcedures([]);
     setMammoplastiaSiliconeAck(false);
-    setDetalhesCirurgia('');
+    setDetalhesResultado('');
+    setRegioes('');
+    setIntensity(50);
   };
 
   useEffect(() => {
@@ -337,10 +329,10 @@ const NewSimulation = () => {
         .join(' · ');
     }
     return selectedProcedures
-      .map((id) => procedures.find((p) => p.id === id)?.name)
+      .map((id) => clinicProcedures.find((p) => p.id === id)?.name)
       .filter(Boolean)
       .join(' · ');
-  }, [practiceProfile, procedures, selectedProcedures]);
+  }, [practiceProfile, clinicProcedures, selectedProcedures]);
 
   const steps = [
     { num: 1, label: 'Enviar Foto' },
@@ -458,11 +450,11 @@ const NewSimulation = () => {
             <div className="-mt-1 mb-4 flex justify-end">
               <button
                 type="button"
-                onClick={resetToProfileSelection}
+                onClick={() => resetToProfileSelection()}
                 disabled={isGenerating}
                 className="text-xs font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Alterar perfil
+                Alterar perfil de atuação
               </button>
             </div>
         {/* Step 1: Upload */}
@@ -679,40 +671,55 @@ const NewSimulation = () => {
               </p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {(practiceProfile === 'surgeon' ? plasticSurgeryProcedures : procedures).map((p) => {
-                const selected = selectedProcedures.includes(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => toggleProcedure(p.id)}
-                    disabled={flowLocked}
-                    className={`rounded-xl border-2 p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border ${
-                      selected
-                        ? 'border-primary bg-sidebar-accent'
-                        : 'border-border hover:border-primary/30'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[10px] font-bold ${
-                          selected
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-muted-foreground/40 bg-background'
-                        }`}
-                        aria-hidden
-                      >
-                        {selected ? '✓' : ''}
-                      </span>
-                      <span className="text-2xl">{p.icon}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.description}</p>
+              {practiceProfile === 'clinic' && loadingClinicProcedures ? (
+                <p className="col-span-full text-sm text-muted-foreground py-6 text-center">
+                  Carregando procedimentos da clínica…
+                </p>
+              ) : practiceProfile === 'clinic' && clinicProceduresError ? (
+                <p className="col-span-full text-sm text-destructive py-6 text-center">
+                  Não foi possível carregar os procedimentos. Verifique o back-end e tente novamente.
+                </p>
+              ) : practiceProfile === 'clinic' && clinicProcedures.length === 0 ? (
+                <p className="col-span-full text-sm text-muted-foreground py-6 text-center rounded-xl border border-border bg-muted/20 px-4">
+                  Nenhum procedimento de clínica disponível. Confirme se o back-end está atualizado e
+                  reinicie o servidor (o catálogo é sincronizado na subida).
+                </p>
+              ) : (
+                (practiceProfile === 'surgeon' ? plasticSurgeryProcedures : clinicProcedures).map((p) => {
+                  const selected = selectedProcedures.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleProcedure(p.id)}
+                      disabled={flowLocked}
+                      className={`rounded-xl border-2 p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border ${
+                        selected
+                          ? 'border-primary bg-sidebar-accent'
+                          : 'border-border hover:border-primary/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-[10px] font-bold ${
+                            selected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-muted-foreground/40 bg-background'
+                          }`}
+                          aria-hidden
+                        >
+                          {selected ? '✓' : ''}
+                        </span>
+                        <span className="text-2xl">{p.icon}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{p.description}</p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })
+              )}
             </div>
             {mammoplastiaSelected && (
               <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-4">
@@ -755,25 +762,27 @@ const NewSimulation = () => {
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[100px] disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
-            {practiceProfile === 'surgeon' ? (
-              <div>
-                <label htmlFor="detalhes-cirurgia-textarea" className="text-xs text-muted-foreground mb-1 block">
-                  Detalhes / resultado desejado *
-                </label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Explique o resultado estético que o paciente espera (formato, volume, linhas, simetria). A IA usa este texto no prompt cirúrgico.
-                </p>
-                <textarea
-                  id="detalhes-cirurgia-textarea"
-                  value={detalhesCirurgia}
-                  onChange={(e) => setDetalhesCirurgia(e.target.value)}
-                  placeholder="Ex.: nariz mais refinado na ponta, dorso reto, resultado natural"
-                  rows={4}
-                  disabled={flowLocked}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[100px] disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-            ) : null}
+            <div>
+              <label htmlFor="detalhes-resultado-textarea" className="text-xs text-muted-foreground mb-1 block">
+                Detalhes / resultado desejado
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Explique o resultado estético que o paciente espera (formato, volume, linhas, simetria). Opcional: a IA usa este texto para refinar o prompt quando preenchido.
+              </p>
+              <textarea
+                id="detalhes-resultado-textarea"
+                value={detalhesResultado}
+                onChange={(e) => setDetalhesResultado(e.target.value)}
+                placeholder={
+                  practiceProfile === 'surgeon'
+                    ? 'Ex.: nariz mais refinado na ponta, dorso reto, resultado natural'
+                    : 'Ex.: preenchimento suave do sulco, projeção discreta do queixo, resultado natural'
+                }
+                rows={4}
+                disabled={flowLocked}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[100px] disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
           </div>
         )}
 
@@ -830,10 +839,10 @@ const NewSimulation = () => {
                 <span className="font-medium text-foreground">{selectedProcedureLabels || '—'}</span>
               </p>
               <p className="text-sm text-muted-foreground">Regiões: <span className="font-medium text-foreground">{regioes.trim() || '—'}</span></p>
-              {practiceProfile === 'surgeon' ? (
+              {detalhesResultado.trim() ? (
                 <p className="text-sm text-muted-foreground">
                   Detalhes desejados:{' '}
-                  <span className="font-medium text-foreground">{detalhesCirurgia.trim() || '—'}</span>
+                  <span className="font-medium text-foreground">{detalhesResultado.trim()}</span>
                 </p>
               ) : null}
               <p className="text-sm text-muted-foreground">Intensidade: <span className="font-medium text-foreground">{intensityLabel} ({intensity}%)</span></p>
@@ -876,12 +885,18 @@ const NewSimulation = () => {
         <div className="flex justify-between mt-8 pt-6 border-t border-border">
             <button
             type="button"
-            onClick={() => setStep(Math.max(1, step - 1))}
-            disabled={step === 1 || isGenerating}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 transition-all"
+            onClick={() => {
+              if (step === 1) {
+                resetToProfileSelection();
+                return;
+              }
+              setStep(Math.max(1, step - 1));
+            }}
+            disabled={isGenerating}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
-            Voltar
+            {step === 1 ? 'Trocar clínica / cirurgião' : 'Voltar'}
           </button>
           {step < 5 && (
             <button
@@ -895,11 +910,14 @@ const NewSimulation = () => {
                     (patientMode === 'new' && (!patientName.trim() || !patientPhone.trim())) ||
                     (patientMode === 'existing' && !selectedPatientId))) ||
                 (step === 2 &&
-                  (selectedProcedures.length === 0 ||
-                    (mammoplastiaSelected && !mammoplastiaSiliconeAck))) ||
-                (step === 3 &&
-                  (!regioes.trim() ||
-                    (practiceProfile === 'surgeon' && !detalhesCirurgia.trim())))
+                  (practiceProfile === 'clinic'
+                    ? loadingClinicProcedures ||
+                      clinicProceduresError ||
+                      clinicProcedures.length === 0 ||
+                      selectedProcedures.length === 0
+                    : selectedProcedures.length === 0 ||
+                      (mammoplastiaSelected && !mammoplastiaSiliconeAck))) ||
+                (step === 3 && !regioes.trim())
               }
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-medium shadow-primary hover:opacity-90 disabled:opacity-30 transition-all"
             >

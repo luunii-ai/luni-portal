@@ -23,7 +23,7 @@ export interface SimulationFlowSnapshot {
   activePointIds?: number[];
   /** Perfil escolhido no início do fluxo (clínica estética vs cirurgião plástico). */
   practiceProfile?: 'clinic' | 'surgeon';
-  /** Descrição do resultado desejado (perfil cirurgião); obrigatório na geração. */
+  /** Detalhes / resultado desejado preenchidos no fluxo (campo opcional). */
   detalhes?: string;
 }
 

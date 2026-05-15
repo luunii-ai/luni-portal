@@ -9,6 +9,8 @@ export const procedureIdToApiTipo: Record<string, string> = {
   jawline: 'Contorno de Mandíbula',
   'cheek-filler': 'Preenchimento Malar',
   nose: 'Rinomodelação',
+  'bigode-chines': 'Bigode chinês (sulco nasogeniano)',
+  mento: 'Preenchimento de mento (queixo)',
   ...plasticSurgeryProcedureApiTipoMap,
 };
 
@@ -36,7 +38,7 @@ export interface EnhanceImageParams {
   intensidade: string;
   /** Perfil do prompt no agente: injetáveis vs cirúrgico. Padrão: clinic. */
   practiceProfile?: EnhancePracticeProfile;
-  /** Obrigatório quando practiceProfile é surgeon; enviado ao agente como detalhes → descricao_usuario. */
+  /** Opcional; enviado ao agente como `detalhes` → `{descricao_usuario}` (clinic ou surgeon). */
   detalhes?: string;
 }
 

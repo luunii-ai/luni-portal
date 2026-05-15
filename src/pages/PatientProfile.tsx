@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { resolveSimulationProcedureId } from '@/lib/resolveSimulationProcedureId';
 
 const PatientProfile = () => {
   const { id } = useParams();
@@ -63,10 +64,8 @@ const PatientProfile = () => {
     setEditPhone(formatBrazilPhoneInput(patient.phone || ''));
   }, [patient]);
 
-  const getProcedureId = (procedureName: string, procedureId?: string) => {
-    if (procedureId) return procedureId;
-    return procedures.find((p) => p.name === procedureName)?.id || 'botox';
-  };
+  const getProcedureId = (procedureName: string, procedureId?: string) =>
+    resolveSimulationProcedureId(procedureName, procedures, procedureId);
 
   const savePatientProfile = async () => {
     if (!id) return;
@@ -315,7 +314,9 @@ const PatientProfile = () => {
             <div className="p-8 text-center text-muted-foreground text-sm">Nenhuma simulação registrada.</div>
           ) : (
             <div className="divide-y divide-border">
-              {patientSims.map((sim) => (
+              {patientSims.map((sim) => {
+                const resolvedProcedureId = getProcedureId(sim.procedure, sim.procedureId);
+                return (
                 <div
                   key={sim.id}
                   className="flex items-stretch gap-0 hover:bg-secondary/50 transition-colors"
@@ -327,7 +328,8 @@ const PatientProfile = () => {
                         : '/resultado-simulacao'
                     }
                     state={{
-                      procedure: getProcedureId(sim.procedure, sim.procedureId),
+                      procedure: resolvedProcedureId,
+                      procedures: [resolvedProcedureId],
                       intensity: sim.intensity,
                       image: sim.image,
                       activePointIds: sim.activePointIds,
@@ -390,7 +392,8 @@ const PatientProfile = () => {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
