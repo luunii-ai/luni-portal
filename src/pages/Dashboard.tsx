@@ -105,7 +105,7 @@ const Dashboard = () => {
             <p className="ds-label-mono mb-1">Lista</p>
             <h2 className="font-display font-semibold text-foreground">Simulações recentes</h2>
           </div>
-          <Link to="/historico" className="text-xs font-medium text-primary hover:underline">
+          <Link to="/pacientes" className="text-xs font-medium text-primary hover:underline">
             Ver todas
           </Link>
         </div>

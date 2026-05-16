@@ -255,6 +255,87 @@ function parseEnhanceResponse(data: unknown): EnhanceImageResult {
   };
 }
 
+function dataUrlToBase64(dataUrl: string): { base64: string; mime: string } {
+  const m = /^data:([^;]+);base64,(.+)$/i.exec(dataUrl);
+  if (m) return { mime: m[1].trim(), base64: m[2].replace(/\s/g, '') };
+  return { mime: 'image/png', base64: dataUrl.replace(/\s/g, '') };
+}
+
+function mimeFromDataUrl(dataUrl: string): string {
+  return dataUrlToBase64(dataUrl).mime;
+}
+
+export interface FinalizePreviewResult {
+  pairId?: string;
+  r2OriginalUrl?: string;
+  r2AfterUrl?: string;
+}
+
+export async function enhancePreview(params: EnhanceImageParams): Promise<EnhanceImageResult> {
+  const { file, tipo_procedimento, regioes, intensidade, practiceProfile, detalhes } = params;
+  const formData = new FormData();
+  formData.append('image', file, file instanceof File ? file.name : 'upload.jpg');
+  for (const tipo of tipo_procedimento) {
+    const t = tipo.trim();
+    if (t) formData.append('tipo_procedimento', t);
+  }
+  formData.append('regioes', regioes);
+  formData.append('intensidade', intensidade);
+  if (practiceProfile) {
+    formData.append('practice_profile', practiceProfile);
+  }
+  const d = detalhes?.trim();
+  if (d) formData.append('detalhes', d);
+
+  const url = `${getAppApiBaseUrl()}/v1/enhance?preview=1&format=json`;
+  const token = getAppAuthToken();
+
+  const { data } = await axios.post<Record<string, unknown>>(url, formData, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+
+  const parsed = parseEnhanceResponse(data);
+  return parsed;
+}
+
+export async function finalizePreview(params: {
+  originalDataUrl: string;
+  originalMime: string;
+  afterDataUrl: string;
+  afterMime?: string;
+}): Promise<FinalizePreviewResult> {
+  const { originalDataUrl, originalMime, afterDataUrl } = params;
+  const afterMime = params.afterMime ?? mimeFromDataUrl(afterDataUrl);
+
+  const { base64: originalBase64 } = dataUrlToBase64(originalDataUrl);
+  const { base64: afterBase64 } = dataUrlToBase64(afterDataUrl);
+
+  const url = `${getAppApiBaseUrl()}/v1/enhance/finalize`;
+  const token = getAppAuthToken();
+
+  const { data } = await axios.post<{
+    pairId?: string | null;
+    r2_original_url?: string;
+    r2_after_url?: string;
+  }>(
+    url,
+    { originalBase64, originalMime, afterBase64, afterMime },
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+
+  return {
+    pairId: data?.pairId ?? undefined,
+    r2OriginalUrl:
+      typeof data?.r2_original_url === 'string' && data.r2_original_url.trim()
+        ? data.r2_original_url.trim()
+        : undefined,
+    r2AfterUrl:
+      typeof data?.r2_after_url === 'string' && data.r2_after_url.trim()
+        ? data.r2_after_url.trim()
+        : undefined,
+  };
+}
+
 export async function enhanceImage(params: EnhanceImageParams): Promise<EnhanceImageResult> {
   const { file, tipo_procedimento, regioes, intensidade, practiceProfile, detalhes } = params;
   const formData = new FormData();

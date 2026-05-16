@@ -14,6 +14,8 @@ export interface AppUserDto {
   trialEndsAt?: string;
   simulationCreditsRemaining?: number;
   simulationMonthlyQuota?: number;
+  previewCreditsRemaining?: number;
+  previewMonthlyQuota?: number;
   accountType?: AppAccountType;
   partnerTestExpiresAt?: string | null;
 }

@@ -14,6 +14,8 @@ export interface User {
   trialEndsAt?: string;
   simulationCreditsRemaining: number;
   simulationMonthlyQuota: number;
+  previewCreditsRemaining: number;
+  previewMonthlyQuota: number;
   accountType: AppAccountType;
   partnerTestExpiresAt?: string | null;
 }
@@ -31,6 +33,8 @@ function mapDto(u: AppUserDto): User {
     trialEndsAt: u.trialEndsAt,
     simulationCreditsRemaining: u.simulationCreditsRemaining ?? 0,
     simulationMonthlyQuota: u.simulationMonthlyQuota ?? 0,
+    previewCreditsRemaining: u.previewCreditsRemaining ?? 0,
+    previewMonthlyQuota: u.previewMonthlyQuota ?? 0,
     accountType: u.accountType === 'partner_test' ? 'partner_test' : 'official',
     partnerTestExpiresAt: u.partnerTestExpiresAt ?? null,
   };

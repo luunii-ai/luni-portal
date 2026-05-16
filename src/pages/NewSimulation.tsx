@@ -9,11 +9,19 @@ import type { Patient } from '@/data/mockData';
 import patientBeforeImg from '@/assets/patient-before.jpg';
 import {
   enhanceImage,
+  enhancePreview,
+  finalizePreview,
   enhanceErrorMessage,
   mapProcedureIdsToApiTipos,
   intensityPercentToApiLabel,
 } from '@/controllers/enhanceApi';
 import { toast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { storeEnhanceAfterImage, storeEnhanceMeta } from '@/lib/enhanceResultStorage';
 import { persistSimulationFlow } from '@/lib/simulationFlowStorage';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
@@ -26,6 +34,40 @@ import {
 } from '@/data/plasticSurgeryProcedures';
 
 type PatientMode = 'new' | 'existing';
+
+type PreviewZoomPayload = { src: string; caption: string };
+
+const previewThumbButtonClass =
+  'group relative flex w-full cursor-zoom-in justify-center overflow-hidden rounded-lg bg-muted/30 p-2 text-center transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
+
+function PreviewZoomDialog({
+  payload,
+  onOpenChange,
+}: {
+  payload: PreviewZoomPayload | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const open = Boolean(payload?.src);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[94vh] w-[calc(100vw-1rem)] max-w-none flex-col gap-3 overflow-auto border bg-background p-4 sm:w-[min(94vw,56rem)] sm:max-w-[min(94vw,56rem)] sm:p-6 lg:gap-4">
+        <DialogHeader className="shrink-0 space-y-0 text-left">
+          <DialogTitle className="font-display text-lg font-semibold leading-tight">{payload?.caption ?? 'Visualização ampliada'}</DialogTitle>
+        </DialogHeader>
+        {payload?.src ? (
+          <div className="flex min-h-0 flex-1 justify-center rounded-lg bg-muted/25 p-1 sm:p-2">
+            <img
+              src={payload.src}
+              alt=""
+              className="max-h-[min(82vh,calc(100vh-11rem))] w-full object-contain"
+            />
+          </div>
+        ) : null}
+        <p className="sr-only">Feche o diálogo para continuar ou pressione Escape.</p>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const NewSimulation = () => {
   const [practiceProfile, setPracticeProfile] = useState<PracticeProfile | null>(null);
@@ -41,6 +83,11 @@ const NewSimulation = () => {
   const [detalhesResultado, setDetalhesResultado] = useState('');
   const [intensity, setIntensity] = useState(50);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewMime, setPreviewMime] = useState<string>('image/png');
+  const [previewIntensity, setPreviewIntensity] = useState<number | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState<PreviewZoomPayload | null>(null);
   const [patientMode, setPatientMode] = useState<PatientMode>('new');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patientSearch, setPatientSearch] = useState('');
@@ -48,7 +95,9 @@ const NewSimulation = () => {
   const navigate = useNavigate();
   const { user, refreshMe } = useAuth();
   const hasSimulationCredit = (user?.simulationCreditsRemaining ?? 0) > 0;
+  const hasPreviewCredit = (user?.previewCreditsRemaining ?? 0) > 0;
   const flowLocked = !hasSimulationCredit;
+  const previewIsValid = previewImage !== null && previewIntensity === intensity;
 
   useEffect(() => {
     if (flowLocked) setStep(1);
@@ -213,24 +262,54 @@ const NewSimulation = () => {
 
     setIsGenerating(true);
     try {
-      const result = await enhanceImage({
-        file: imageFile,
-        tipo_procedimento: tiposApi,
-        regioes: regioes.trim(),
-        intensidade: intensityPercentToApiLabel(intensity),
-        practiceProfile: practiceProfile ?? 'clinic',
-        detalhes: detalhesResultado.trim() || undefined,
-      });
+      let afterDataUrl: string;
+      let resultPairId: string | undefined;
+      let resultR2OriginalUrl: string | undefined;
+      let resultR2AfterUrl: string | undefined;
+      let resultPoints: import('@/controllers/enhanceApi').EnhanceApiPoint[] = [];
+      let resultMarkedImageUrl: string | null = null;
+      let resultMarkedDataUrl: string | null = null;
 
-      const storedOk = storeEnhanceAfterImage(result.afterDataUrl);
+      if (previewIsValid && uploadedImage) {
+        // Aceitar o preview: apenas salvar no R2 sem chamar o agente novamente
+        const finalizeResult = await finalizePreview({
+          originalDataUrl: uploadedImage,
+          originalMime: imageFile.type || 'image/jpeg',
+          afterDataUrl: previewImage!,
+          afterMime: previewMime,
+        });
+        afterDataUrl = previewImage!;
+        resultPairId = finalizeResult.pairId;
+        resultR2OriginalUrl = finalizeResult.r2OriginalUrl;
+        resultR2AfterUrl = finalizeResult.r2AfterUrl;
+      } else {
+        // Fluxo normal: chamar agente e debitar crédito de simulação
+        const result = await enhanceImage({
+          file: imageFile,
+          tipo_procedimento: tiposApi,
+          regioes: regioes.trim(),
+          intensidade: intensityPercentToApiLabel(intensity),
+          practiceProfile: practiceProfile ?? 'clinic',
+          detalhes: detalhesResultado.trim() || undefined,
+        });
+        afterDataUrl = result.afterDataUrl;
+        resultPairId = result.pairId;
+        resultR2OriginalUrl = result.r2OriginalUrl;
+        resultR2AfterUrl = result.r2AfterUrl;
+        resultPoints = result.points;
+        resultMarkedImageUrl = result.markedImageUrl;
+        resultMarkedDataUrl = result.markedDataUrl;
+      }
+
+      const storedOk = storeEnhanceAfterImage(afterDataUrl);
       storeEnhanceMeta({
-        points: result.points,
-        markedImageUrl: result.markedImageUrl,
+        points: resultPoints,
+        markedImageUrl: resultMarkedImageUrl,
       });
 
       const phoneDigits = phoneDigitsOnly(patientPhone);
       const flowSnapshot = {
-        pairId: result.pairId,
+        pairId: resultPairId,
         practiceProfile: practiceProfile ?? undefined,
         patientDraft: {
           name: patientName.trim(),
@@ -247,11 +326,10 @@ const NewSimulation = () => {
         procedure: selectedProcedures[0],
         enhanceAfterFromSession: storedOk,
         enhanceMetaFromSession: true,
-        r2OriginalUrl: result.r2OriginalUrl,
-        r2AfterUrl: result.r2AfterUrl,
-        ...(storedOk ? {} : { afterImage: result.afterDataUrl }),
-        // Sem pairId as fotos vêm só do state; com pairId evitamos base64 em history.state (limite do browser).
-        ...(result.pairId ? {} : { image: uploadedImage ?? undefined }),
+        r2OriginalUrl: resultR2OriginalUrl,
+        r2AfterUrl: resultR2AfterUrl,
+        ...(storedOk ? {} : { afterImage: afterDataUrl }),
+        ...(resultPairId ? {} : { image: uploadedImage ?? undefined }),
         ...(detalhesResultado.trim() ? { detalhes: detalhesResultado.trim() } : {}),
       };
       persistSimulationFlow(flowSnapshot);
@@ -259,25 +337,25 @@ const NewSimulation = () => {
 
       navigate({
         pathname: '/resultado-simulacao',
-        search: result.pairId ? `?pairId=${encodeURIComponent(result.pairId)}` : '',
+        search: resultPairId ? `?pairId=${encodeURIComponent(resultPairId)}` : '',
         state: {
           practiceProfile: practiceProfile ?? undefined,
           procedures: selectedProcedures,
           procedure: selectedProcedures[0],
           intensity,
-          ...(result.pairId ? {} : { image: uploadedImage }),
+          ...(resultPairId ? {} : { image: uploadedImage }),
           patientMode,
           selectedPatientId:
             patientMode === 'existing' && selectedPatientId ? selectedPatientId : undefined,
           ...(patientMode === 'existing' && selectedPatientId
             ? { patientId: selectedPatientId }
             : {}),
-          pairId: result.pairId,
-          r2OriginalUrl: result.r2OriginalUrl,
-          r2AfterUrl: result.r2AfterUrl,
+          pairId: resultPairId,
+          r2OriginalUrl: resultR2OriginalUrl,
+          r2AfterUrl: resultR2AfterUrl,
           enhanceAfterFromSession: storedOk,
           enhanceMetaFromSession: true,
-          ...(storedOk ? {} : { afterImage: result.afterDataUrl }),
+          ...(storedOk ? {} : { afterImage: afterDataUrl }),
           patientDraft: flowSnapshot.patientDraft,
           patient: {
             name: patientName.trim(),
@@ -297,6 +375,46 @@ const NewSimulation = () => {
     }
   };
 
+  const handlePreview = async () => {
+    if (!imageFile || selectedProcedures.length === 0) return;
+    if (!hasPreviewCredit) {
+      toast({
+        title: 'Pré-visualizações esgotadas',
+        description: `Você usou todas as ${user?.previewMonthlyQuota ?? 0} pré-visualizações do mês.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const tiposApi = mapProcedureIdsToApiTipos(selectedProcedures);
+    if (!tiposApi.length) return;
+
+    setIsGeneratingPreview(true);
+    try {
+      const result = await enhancePreview({
+        file: imageFile,
+        tipo_procedimento: tiposApi,
+        regioes: regioes.trim(),
+        intensidade: intensityPercentToApiLabel(intensity),
+        practiceProfile: practiceProfile ?? 'clinic',
+        detalhes: detalhesResultado.trim() || undefined,
+      });
+      const mime = result.afterDataUrl.match(/^data:([^;]+);/)?.[1] ?? 'image/png';
+      setPreviewImage(result.afterDataUrl);
+      setPreviewMime(mime);
+      setPreviewIntensity(intensity);
+      void refreshMe();
+    } catch (err) {
+      toast({
+        title: 'Falha na pré-visualização',
+        description: enhanceErrorMessage(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
+
   const intensityLabel = intensity < 33 ? 'Sutil' : intensity < 66 ? 'Moderado' : 'Dramático';
   const toggleProcedure = (id: string) => {
     if (flowLocked) return;
@@ -313,6 +431,8 @@ const NewSimulation = () => {
     setDetalhesResultado('');
     setRegioes('');
     setIntensity(50);
+    setPreviewImage(null);
+    setPreviewIntensity(null);
   };
 
   useEffect(() => {
@@ -344,6 +464,12 @@ const NewSimulation = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
+      <PreviewZoomDialog
+        payload={previewZoom}
+        onOpenChange={(open) => {
+          if (!open) setPreviewZoom(null);
+        }}
+      />
       <div>
         <p className="ds-label-mono mb-1">Fluxo</p>
         <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
@@ -808,7 +934,14 @@ const NewSimulation = () => {
                     min={0}
                     max={100}
                     value={intensity}
-                    onChange={(e) => setIntensity(Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setIntensity(v);
+                      if (previewImage !== null) {
+                        setPreviewImage(null);
+                        setPreviewIntensity(null);
+                      }
+                    }}
                     disabled={flowLocked}
                     className="absolute inset-0 w-full h-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
                   />
@@ -825,6 +958,88 @@ const NewSimulation = () => {
                 <p className="text-lg font-bold text-primary font-display">{intensityLabel} ({intensity}%)</p>
               </div>
             </div>
+
+            {/* Preview section */}
+            {(user?.previewMonthlyQuota ?? 0) > 0 && (
+              <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">Pré-visualização</p>
+                  <span className="text-xs text-muted-foreground">
+                    {user?.previewCreditsRemaining ?? 0}/{user?.previewMonthlyQuota ?? 0} restantes
+                  </span>
+                </div>
+
+                {previewImage && (
+                  <div className="flex gap-3">
+                    <div className="flex-1 space-y-1">
+                      <p className="text-center text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Antes
+                      </p>
+                      <button
+                        type="button"
+                        aria-label="Ampliar imagem antes da pré-visualização"
+                        className={previewThumbButtonClass + ' border-border'}
+                        disabled={!uploadedImage}
+                        onClick={() => uploadedImage && setPreviewZoom({ src: uploadedImage, caption: 'Antes' })}
+                      >
+                        <img
+                          src={uploadedImage ?? ''}
+                          alt=""
+                          className="mx-auto max-h-[min(18rem,45vh)] w-full object-contain"
+                        />
+                        <span className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-t from-background/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100">
+                          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] font-medium text-foreground shadow-sm">
+                            Toque para ampliar
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-center text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Depois
+                      </p>
+                      <button
+                        type="button"
+                        aria-label="Ampliar pré-visualização (depois)"
+                        className={previewThumbButtonClass + ' border-primary/30'}
+                        onClick={() => setPreviewZoom({ src: previewImage, caption: 'Depois (prévia)' })}
+                      >
+                        <img
+                          src={previewImage}
+                          alt=""
+                          className="mx-auto max-h-[min(18rem,45vh)] w-full object-contain"
+                        />
+                        <span className="pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-t from-background/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100">
+                          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] font-medium text-foreground shadow-sm">
+                            Toque para ampliar
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {isGeneratingPreview ? (
+                  <div className="flex items-center justify-center gap-2 py-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <span className="text-sm text-muted-foreground">Gerando prévia…</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handlePreview()}
+                    disabled={!hasPreviewCredit || flowLocked || isGenerating}
+                    className="w-full rounded-lg border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {!hasPreviewCredit
+                      ? 'Pré-visualizações esgotadas'
+                      : previewImage
+                        ? 'Gerar nova prévia (−1 crédito)'
+                        : 'Ver prévia desta intensidade (−1 crédito)'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -847,8 +1062,63 @@ const NewSimulation = () => {
               ) : null}
               <p className="text-sm text-muted-foreground">Intensidade: <span className="font-medium text-foreground">{intensityLabel} ({intensity}%)</span></p>
             </div>
-            {uploadedImage && (
-              <img src={uploadedImage} alt="Preview" className="w-48 h-48 object-cover rounded-xl mx-auto" />
+            {previewIsValid ? (
+              <div className="flex gap-3 justify-center">
+                <div className="space-y-1">
+                  <p className="text-center text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Antes
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="Ampliar foto antes"
+                    className={previewThumbButtonClass + ' border-border'}
+                    disabled={!uploadedImage}
+                    onClick={() => uploadedImage && setPreviewZoom({ src: uploadedImage, caption: 'Antes' })}
+                  >
+                    <img
+                      src={uploadedImage ?? ''}
+                      alt=""
+                      className="mx-auto h-44 w-full max-w-[12rem] object-contain sm:h-52 sm:max-w-[14rem]"
+                    />
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-center text-[10px] uppercase tracking-widest text-primary">
+                    Prévia aprovada
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="Ampliar prévia aprovada"
+                    className={previewThumbButtonClass + ' border-2 border-primary/40'}
+                    onClick={() => setPreviewZoom({ src: previewImage!, caption: 'Prévia aprovada' })}
+                  >
+                    <img
+                      src={previewImage!}
+                      alt=""
+                      className="mx-auto h-44 w-full max-w-[12rem] object-contain sm:h-52 sm:max-w-[14rem]"
+                    />
+                  </button>
+                </div>
+              </div>
+            ) : uploadedImage ? (
+              <button
+                type="button"
+                aria-label="Ampliar foto do paciente"
+                className={cn(previewThumbButtonClass, 'mx-auto border-border')}
+                onClick={() => uploadedImage && setPreviewZoom({ src: uploadedImage, caption: 'Foto do paciente' })}
+              >
+                <img
+                  src={uploadedImage}
+                  alt=""
+                  className="mx-auto h-52 w-auto max-w-full object-cover sm:h-56"
+                />
+              </button>
+            ) : null}
+
+            {previewIsValid && (
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                A pré-visualização aprovada será salva sem consumir créditos de simulação.
+              </p>
             )}
             
             {isGenerating ? (
@@ -875,7 +1145,7 @@ const NewSimulation = () => {
                 className="px-8 py-3 rounded-xl gradient-primary text-primary-foreground font-medium text-sm shadow-primary hover:opacity-90 transition-all inline-flex items-center gap-2"
               >
                 <img src={brandMark} alt="" className="h-4 w-4 object-contain brightness-0 invert" width={16} height={16} />
-                Gerar Simulação com IA
+                {previewIsValid ? 'Confirmar e Salvar Resultado' : 'Gerar Simulação com IA'}
               </button>
             )}
           </div>

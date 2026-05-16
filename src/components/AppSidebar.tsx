@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Users, Settings, LogOut, Calculator, Zap } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, Settings, LogOut, Calculator, Zap, Eye } from 'lucide-react';
 import { brandWordmark } from '@/assets/brandAssets';
 import { useAuth } from '@/contexts/AuthContext';
 import { partnerTestLockState } from '@/lib/partnerTest';
@@ -182,6 +182,26 @@ export function AppSidebarContent({ onNavigate }: AppSidebarContentProps) {
             </div>
           </div>
         )}
+        {user && user.previewMonthlyQuota > 0 && (
+          <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+            <Eye className="h-4 w-4 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium">
+                <span className="text-foreground">{user.previewCreditsRemaining} / {user.previewMonthlyQuota}</span>
+                <span className="ml-1 font-normal text-muted-foreground">prévias</span>
+              </p>
+              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-border/60">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{
+                    width: `${Math.min(100, Math.round((user.previewCreditsRemaining / user.previewMonthlyQuota) * 100))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3 py-2">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full gradient-primary text-xs font-bold text-primary-foreground">
             {user?.name?.charAt(0) || 'U'}
