@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Upload, Camera, Check, ArrowRight, ArrowLeft, UserPlus, Users, Building2, Scissors } from 'lucide-react';
 import { brandMark } from '@/assets/brandAssets';
 import { fetchProcedures } from '@/controllers/proceduresApi';
-import { fetchPatients } from '@/controllers/patientsApi';
+import { fetchPatients, ensurePatient, recordPatientPhotoConsent } from '@/controllers/patientsApi';
 import type { Patient } from '@/data/mockData';
 import patientBeforeImg from '@/assets/patient-before.jpg';
 import {
@@ -27,6 +27,7 @@ import { persistSimulationFlow } from '@/lib/simulationFlowStorage';
 import { buildEnhanceRegionsText } from '@/lib/enhanceProcedureRegions';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
 import { useAuth } from '@/contexts/AuthContext';
+import { legalDocumentLinkProps } from '@legal/linkProps';
 import { cn } from '@/lib/utils';
 import {
   MAMMOPLASTY_PROCEDURE_ID,
@@ -91,6 +92,8 @@ const NewSimulation = () => {
   const [patientMode, setPatientMode] = useState<PatientMode>('new');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patientSearch, setPatientSearch] = useState('');
+  const [patientConsentAck, setPatientConsentAck] = useState(false);
+  const [enhancePatientId, setEnhancePatientId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { user, refreshMe } = useAuth();
@@ -203,6 +206,50 @@ const NewSimulation = () => {
     setImageFile(null);
   };
 
+  const resolvePatientForEnhance = async (): Promise<string | null> => {
+    if (!patientConsentAck) {
+      toast({
+        title: 'Consentimento necessário',
+        description: 'Confirme que o paciente autorizou o uso da foto para simulação estética.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    if (patientMode === 'new') {
+      if (!patientName.trim() || !phoneDigitsOnly(patientPhone)) {
+        toast({
+          title: 'Dados do cliente',
+          description: 'Informe nome e telefone com DDD antes de gerar.',
+          variant: 'destructive',
+        });
+        return null;
+      }
+      const ensured = await ensurePatient({
+        name: patientName.trim(),
+        email: patientEmail.trim(),
+        phone: phoneDigitsOnly(patientPhone),
+        recordPhotoConsent: true,
+      });
+      setSelectedPatientId(ensured.id);
+      setEnhancePatientId(ensured.id);
+      return ensured.id;
+    }
+
+    if (!selectedPatientId) {
+      toast({
+        title: 'Selecione um paciente',
+        description: 'Escolha um paciente na lista para continuar.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    const updated = await recordPatientPhotoConsent(selectedPatientId);
+    setEnhancePatientId(updated.id);
+    return updated.id;
+  };
+
   const handleGenerate = async () => {
     if (!imageFile || selectedProcedures.length === 0) {
       toast({
@@ -226,6 +273,15 @@ const NewSimulation = () => {
       toast({
         title: 'Selecione um paciente',
         description: 'Escolha um paciente na lista para continuar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!patientConsentAck) {
+      toast({
+        title: 'Consentimento necessário',
+        description: 'Confirme que o paciente autorizou o uso da foto para simulação estética.',
         variant: 'destructive',
       });
       return;
@@ -262,6 +318,12 @@ const NewSimulation = () => {
 
     setIsGenerating(true);
     try {
+      const patientIdForEnhance = await resolvePatientForEnhance();
+      if (!patientIdForEnhance) {
+        setIsGenerating(false);
+        return;
+      }
+
       let afterDataUrl: string;
       let resultPairId: string | undefined;
       let resultR2OriginalUrl: string | undefined;
@@ -292,6 +354,7 @@ const NewSimulation = () => {
           intensidadePct: intensity,
           practiceProfile: practiceProfile ?? 'clinic',
           detalhes: detalhesResultado.trim() || undefined,
+          patientId: patientIdForEnhance,
         });
         afterDataUrl = result.afterDataUrl;
         resultPairId = result.pairId;
@@ -320,8 +383,7 @@ const NewSimulation = () => {
         patientMode,
         selectedPatientId:
           patientMode === 'existing' && selectedPatientId ? selectedPatientId : undefined,
-        patientId:
-          patientMode === 'existing' && selectedPatientId ? selectedPatientId : undefined,
+        patientId: patientIdForEnhance,
         intensity,
         procedures: selectedProcedures,
         procedure: selectedProcedures[0],
@@ -353,7 +415,7 @@ const NewSimulation = () => {
               patientMode === 'existing' && selectedPatientId ? selectedPatientId : undefined,
             ...(patientMode === 'existing' && selectedPatientId
               ? { patientId: selectedPatientId }
-              : {}),
+              : { patientId: patientIdForEnhance }),
             pairId: resultPairId,
             r2OriginalUrl: resultR2OriginalUrl,
             r2AfterUrl: resultR2AfterUrl,
@@ -396,6 +458,9 @@ const NewSimulation = () => {
 
     setIsGeneratingPreview(true);
     try {
+      const patientIdForEnhance = await resolvePatientForEnhance();
+      if (!patientIdForEnhance) return;
+
       const result = await enhancePreview({
         file: imageFile,
         tipo_procedimento: tiposApi,
@@ -404,6 +469,7 @@ const NewSimulation = () => {
         intensidadePct: intensity,
         practiceProfile: practiceProfile ?? 'clinic',
         detalhes: detalhesResultado.trim() || undefined,
+        patientId: patientIdForEnhance,
       });
       const mime = result.afterDataUrl.match(/^data:([^;]+);/)?.[1] ?? 'image/png';
       setPreviewImage(result.afterDataUrl);
@@ -438,6 +504,8 @@ const NewSimulation = () => {
     setIntensity(50);
     setPreviewImage(null);
     setPreviewIntensity(null);
+    setPatientConsentAck(false);
+    setEnhancePatientId(null);
   };
 
   useEffect(() => {
@@ -789,6 +857,26 @@ const NewSimulation = () => {
                   ? 'Campos com * são obrigatórios para continuar.'
                   : 'Selecione um paciente na lista para continuar.'}
               </p>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-4">
+                <input
+                  type="checkbox"
+                  checked={patientConsentAck}
+                  onChange={(e) => setPatientConsentAck(e.target.checked)}
+                  disabled={flowLocked}
+                  className="mt-1 h-4 w-4 rounded border-input"
+                />
+                <span className="text-sm leading-snug text-foreground">
+                  <span className="font-medium">Confirmo que o paciente autorizou o uso da foto</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    A imagem será processada por IA e armazenada na luni para simulação estética
+                    ilustrativa.{' '}
+                    <Link to="/legal/consentimento-paciente" {...legalDocumentLinkProps} className="text-primary hover:underline">
+                      Ver modelo de consentimento
+                    </Link>
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
         )}
@@ -1186,6 +1274,7 @@ const NewSimulation = () => {
                 isGenerating ||
                 (step === 1 &&
                   (!uploadedImage ||
+                    !patientConsentAck ||
                     (patientMode === 'new' && (!patientName.trim() || !patientPhone.trim())) ||
                     (patientMode === 'existing' && !selectedPatientId))) ||
                 (step === 2 &&

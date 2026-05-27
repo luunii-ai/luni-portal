@@ -17,7 +17,9 @@ appApiClient.interceptors.response.use(
   (err) => {
     if (
       err?.response?.status === 403 &&
-      err?.response?.data?.code === 'PARTNER_TEST_LOCKED'
+      (err?.response?.data?.code === 'PARTNER_TEST_LOCKED' ||
+        err?.response?.data?.code === 'PAYMENT_OVERDUE' ||
+        err?.response?.data?.code === 'SUBSCRIPTION_CANCELED')
     ) {
       const path = window.location.pathname || '';
       if (!path.startsWith('/configuracoes')) {

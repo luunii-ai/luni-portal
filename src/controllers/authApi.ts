@@ -12,32 +12,22 @@ export interface AppUserDto {
   firstAccess?: boolean;
   subscriptionStatus?: string;
   trialEndsAt?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
   simulationCreditsRemaining?: number;
   simulationMonthlyQuota?: number;
   previewCreditsRemaining?: number;
   previewMonthlyQuota?: number;
   accountType?: AppAccountType;
   partnerTestExpiresAt?: string | null;
+  termsAcceptedAt?: string;
+  privacyAcceptedAt?: string;
+  termsVersion?: string;
+  patientDataResponsibilityAckAt?: string;
 }
 
 export async function loginRequest(email: string, password: string): Promise<AppUserDto> {
   const { data } = await appApiClient.post<{ token: string; user: AppUserDto }>('/auth/login', {
-    email,
-    password,
-  });
-  setAppAuthToken(data.token);
-  return data.user;
-}
-
-export async function signupRequest(
-  name: string,
-  clinic: string,
-  email: string,
-  password: string,
-): Promise<AppUserDto> {
-  const { data } = await appApiClient.post<{ token: string; user: AppUserDto }>('/auth/signup', {
-    name,
-    clinic,
     email,
     password,
   });

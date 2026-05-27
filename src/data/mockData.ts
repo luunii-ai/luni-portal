@@ -9,6 +9,8 @@ export interface Patient {
   proceduresSimulated: number;
   notes: string;
   avatarUrl?: string;
+  photoConsentAt?: string;
+  photoConsentVersion?: string;
 }
 
 export interface Simulation {

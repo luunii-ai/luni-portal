@@ -2,15 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, ExternalLink, RefreshCcw } from 'lucide-react';
 import { createBillingPortalSession, fetchCurrentSubscription } from '@/controllers/subscriptionApi';
 import { getApiErrorMessage } from '@/controllers/apiErrors';
-import { recurringBillingLabelPt, subscriptionStatusLabelPt } from '@/lib/subscriptionDisplayPt';
+import { recurringBillingLabelPt, subscriptionStatusLabelPt, shouldShowCurrentPeriodEnd, shouldShowTrialEnd } from '@/lib/subscriptionDisplayPt';
 import { useAuth } from '@/contexts/AuthContext';
 import { PartnerSubscriptionCheckout } from '@/components/PartnerSubscriptionCheckout';
 
-function formatDateTime(iso: string | null): string {
+function formatDatePt(iso: string | null | undefined): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('pt-BR');
+  return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatMoney(amountCents: number | null, currency: string | null): string {
@@ -106,18 +106,26 @@ const SubscriptionSettings = () => {
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Plano</p>
               <p className="text-sm font-medium text-foreground">{planDescription}</p>
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Renovação / término do ciclo</p>
-              <p className="text-sm font-medium text-foreground">
-                {formatDateTime(subscription?.currentPeriodEnd || null)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Fim do período de teste</p>
-              <p className="text-sm font-medium text-foreground">
-                {formatDateTime(subscription?.trialEndsAt || null)}
-              </p>
-            </div>
+            {shouldShowTrialEnd(subscription?.status || user?.subscriptionStatus) &&
+            (user?.trialEndsAt || subscription?.trialEndsAt) ? (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Seu teste termina em</p>
+                <p className="text-sm font-medium text-foreground">
+                  {formatDatePt(user?.trialEndsAt || subscription?.trialEndsAt)}
+                </p>
+              </div>
+            ) : null}
+            {shouldShowCurrentPeriodEnd(
+              subscription?.status || user?.subscriptionStatus,
+              subscription?.cancelAtPeriodEnd ?? user?.cancelAtPeriodEnd,
+            ) && (user?.currentPeriodEnd || subscription?.currentPeriodEnd) ? (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Fim do período</p>
+                <p className="text-sm font-medium text-foreground">
+                  {formatDatePt(user?.currentPeriodEnd || subscription?.currentPeriodEnd)}
+                </p>
+              </div>
+            ) : null}
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Cancelamento agendado</p>
               <p className="text-sm font-medium text-foreground">

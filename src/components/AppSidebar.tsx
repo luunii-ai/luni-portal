@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, PlusCircle, Users, Settings, LogOut, Calculator, Zap, Eye } from 'lucide-react';
 import { brandWordmark } from '@/assets/brandAssets';
 import { useAuth } from '@/contexts/AuthContext';
-import { partnerTestLockState } from '@/lib/partnerTest';
+import { billingLockState } from '@/lib/billingLock';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -48,7 +48,7 @@ function quotaRemainingStyle(remaining: number, total: number) {
 export function AppSidebarContent({ onNavigate }: AppSidebarContentProps) {
   const location = useLocation();
   const { user, logout } = useAuth();
-  const partnerLocked = user ? partnerTestLockState(user).locked : false;
+  const billingLocked = user ? billingLockState(user).locked : false;
   const isPartnerTest = user?.accountType === 'partner_test';
   /** Contas oficiais: cota mensal. Parceiro teste: sem cota mensal — barra/tons com denominador mínimo 10 só para UI. */
   const partnerTestBarDen =
@@ -68,7 +68,7 @@ export function AppSidebarContent({ onNavigate }: AppSidebarContentProps) {
     <>
       <div className="shrink-0 border-b border-border/80 p-6">
         <Link
-          to={partnerLocked ? '/configuracoes/assinatura' : '/dashboard'}
+          to={billingLocked ? '/configuracoes/assinatura' : '/dashboard'}
           className="group flex flex-col gap-2"
           onClick={() => onNavigate?.()}
         >
@@ -85,7 +85,7 @@ export function AppSidebarContent({ onNavigate }: AppSidebarContentProps) {
         {navItems.map((item) => {
           const isActive =
             location.pathname === item.path || location.pathname.startsWith(item.path + '/');
-          const disabled = partnerLocked && item.path !== '/configuracoes';
+          const disabled = billingLocked && item.path !== '/configuracoes';
           const inner = (
             <>
               <span

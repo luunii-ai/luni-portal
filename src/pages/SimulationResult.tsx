@@ -403,6 +403,9 @@ const SimulationResult = () => {
           >
             <BeforeAfterSlider beforeImage={beforeImg} afterImage={afterImg} />
           </div>
+          <p className="shrink-0 rounded-lg border border-amber-200/60 bg-amber-50/80 px-3 py-2 text-center text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+            Resultado simulado por IA. Projeção ilustrativa — não garante resultado clínico.
+          </p>
           <p className="shrink-0 pt-1 text-center text-xs text-muted-foreground">
             Arraste o controle para comparar antes e depois
           </p>

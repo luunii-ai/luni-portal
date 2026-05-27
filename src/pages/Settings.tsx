@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Lock, Building2, User, CreditCard } from 'lucide-react';
-import { patchMe } from '@/controllers/userApi';
+import { Save, Lock, Building2, User, CreditCard, ShieldCheck } from 'lucide-react';
+import { patchMe, acceptTermsRequest } from '@/controllers/userApi';
 import { fetchCurrentSubscription, type CurrentSubscriptionDto } from '@/controllers/subscriptionApi';
 import { getApiErrorMessage } from '@/controllers/apiErrors';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
-import { subscriptionStatusLabelPt } from '@/lib/subscriptionDisplayPt';
+import { subscriptionStatusLabelPt, shouldShowCurrentPeriodEnd, shouldShowTrialEnd } from '@/lib/subscriptionDisplayPt';
+import { userHasAcceptedTerms } from '@/lib/termsAcceptance';
+import { LEGAL_VERSION } from '@legal/version';
+import { legalDocumentLinkProps } from '@legal/linkProps';
 
 function formatDatePt(iso: string | null): string {
   if (!iso) return '—';
@@ -28,6 +31,13 @@ const SettingsPage = () => {
   const [stripeSubscription, setStripeSubscription] = useState<CurrentSubscriptionDto | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState('');
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+  const [acceptPatientResponsibility, setAcceptPatientResponsibility] = useState(false);
+  const [termsSaving, setTermsSaving] = useState(false);
+  const [termsError, setTermsError] = useState('');
+  const [termsSaved, setTermsSaved] = useState(false);
+  const termsAccepted = userHasAcceptedTerms(user);
 
   useEffect(() => {
     if (!user) return;
@@ -83,6 +93,30 @@ const SettingsPage = () => {
     }
   };
 
+  const handleAcceptTerms = async () => {
+    setTermsError('');
+    if (!acceptTerms || !acceptPrivacy || !acceptPatientResponsibility) {
+      setTermsError('Marque todas as opções para aceitar e continuar.');
+      return;
+    }
+    setTermsSaving(true);
+    try {
+      const updated = await acceptTermsRequest({
+        termsVersion: LEGAL_VERSION,
+        acceptTerms: true,
+        acceptPrivacy: true,
+        acceptPatientResponsibility: true,
+      });
+      setUserFromDto(updated);
+      setTermsSaved(true);
+      setTimeout(() => setTermsSaved(false), 2500);
+    } catch (err) {
+      setTermsError(getApiErrorMessage(err, 'Não foi possível registrar o aceite.'));
+    } finally {
+      setTermsSaving(false);
+    }
+  };
+
   const inputClass =
     'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary transition-all';
 
@@ -98,6 +132,90 @@ const SettingsPage = () => {
       {error && (
         <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg font-medium">{error}</div>
       )}
+
+      {!termsAccepted && (
+        <div className="rounded-xl border border-amber-300/60 bg-amber-50/80 p-4 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          Para usar simulações, pacientes e demais funcionalidades, aceite os termos na seção{' '}
+          <strong>Privacidade e conformidade</strong> abaixo.
+        </div>
+      )}
+
+      <div className="bg-card rounded-xl p-6 shadow-card space-y-4">
+        <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-primary" />
+          Privacidade e conformidade
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Documentos legais da plataforma. A clínica é controladora dos dados dos pacientes; a luni atua como operadora.
+        </p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link to="/legal/termos" {...legalDocumentLinkProps} className="text-primary hover:underline">
+            Termos de Uso
+          </Link>
+          <Link to="/legal/privacidade" {...legalDocumentLinkProps} className="text-primary hover:underline">
+            Política de Privacidade
+          </Link>
+          <Link to="/legal/consentimento-paciente" {...legalDocumentLinkProps} className="text-primary hover:underline">
+            Modelo de consentimento do paciente
+          </Link>
+        </div>
+        {termsAccepted ? (
+          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+            <p className="font-medium text-foreground">Termos aceitos</p>
+            <p className="mt-1 text-muted-foreground">
+              Versão {user?.termsVersion || LEGAL_VERSION} ·{' '}
+              {user?.termsAcceptedAt
+                ? new Date(user.termsAcceptedAt).toLocaleString('pt-BR')
+                : 'data não registrada'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+            <label className="flex cursor-pointer items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-input"
+              />
+              <span>Li e aceito os Termos de Uso.</span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={acceptPrivacy}
+                onChange={(e) => setAcceptPrivacy(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-input"
+              />
+              <span>Li e aceito a Política de Privacidade.</span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={acceptPatientResponsibility}
+                onChange={(e) => setAcceptPatientResponsibility(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-input"
+              />
+              <span>
+                Declaro ser responsável por obter o consentimento dos pacientes antes de enviar fotos ou dados à
+                plataforma.
+              </span>
+            </label>
+            {termsError && <p className="text-sm text-destructive">{termsError}</p>}
+            {termsSaved && (
+              <p className="text-sm font-medium text-emerald-600">Aceite registrado. Você já pode usar a plataforma.</p>
+            )}
+            <button
+              type="button"
+              onClick={handleAcceptTerms}
+              disabled={termsSaving}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            >
+              {termsSaving ? 'Salvando…' : 'Aceitar e continuar'}
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="bg-card rounded-xl p-6 shadow-card space-y-4">
         <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
@@ -183,25 +301,32 @@ const SettingsPage = () => {
           Assinatura
         </h2>
         <p className="text-sm text-muted-foreground">
-          Troque de plano, cancele assinatura e gerencie seus pagamentos no portal da sua conta. O status abaixo é
-          atualizado direto na Stripe ao abrir esta página.
+          Troque de plano, cancele assinatura e gerencie seus pagamentos no portal da sua conta. O status é
+          consultado na Stripe ao abrir esta página.
         </p>
         {subscriptionLoading ? (
           <p className="text-sm text-muted-foreground">Carregando status da assinatura…</p>
         ) : subscriptionError ? (
           <p className="text-sm text-destructive">{subscriptionError}</p>
-        ) : stripeSubscription ? (
+        ) : stripeSubscription || user?.subscriptionStatus ? (
           <div className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-2">
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
               <p className="text-sm font-medium text-foreground">
-                {subscriptionStatusLabelPt(stripeSubscription.status)}
+                {subscriptionStatusLabelPt(stripeSubscription?.status || user?.subscriptionStatus)}
               </p>
             </div>
-            {stripeSubscription.trialEndsAt ? (
+            {shouldShowTrialEnd(user?.subscriptionStatus) && user?.trialEndsAt ? (
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Fim do teste</p>
-                <p className="text-sm font-medium text-foreground">{formatDatePt(stripeSubscription.trialEndsAt)}</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Seu teste termina em</p>
+                <p className="text-sm font-medium text-foreground">{formatDatePt(user.trialEndsAt)}</p>
+              </div>
+            ) : null}
+            {shouldShowCurrentPeriodEnd(user?.subscriptionStatus, user?.cancelAtPeriodEnd) &&
+            user?.currentPeriodEnd ? (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Fim do período</p>
+                <p className="text-sm font-medium text-foreground">{formatDatePt(user.currentPeriodEnd)}</p>
               </div>
             ) : null}
           </div>

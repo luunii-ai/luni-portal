@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getApiErrorMessage } from '@/controllers/apiErrors';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { brandWordmark } from '@/assets/brandAssets';
+import { landingPlansUrl } from '@/lib/landingUrl';
 
 const inputClass =
   'w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-60';
@@ -123,9 +124,14 @@ const Login = () => {
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Não tem conta?{' '}
-              <Link to="/cadastro" className="font-medium text-primary hover:underline">
-                Criar conta
-              </Link>
+              <a
+                href={landingPlansUrl}
+                className="font-medium text-primary hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Assinar um plano
+              </a>
             </p>
           </div>
         </div>

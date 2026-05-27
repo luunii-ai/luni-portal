@@ -4,10 +4,11 @@ import patientBefore from '@/assets/patient-before.jpg';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Simulation } from '@/data/mockData';
-import { fetchPatient, patchPatient, deletePatient } from '@/controllers/patientsApi';
+import { fetchPatient, patchPatient, deletePatient, recordPatientPhotoConsent } from '@/controllers/patientsApi';
 import { fetchSimulations, deleteSimulation, patchSimulationSale } from '@/controllers/simulationsApi';
 import { fetchProcedures } from '@/controllers/proceduresApi';
 import { getApiErrorMessage } from '@/controllers/apiErrors';
+import { legalDocumentLinkProps } from '@legal/linkProps';
 import { toast } from '@/components/ui/use-toast';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
 import {
@@ -38,6 +39,7 @@ const PatientProfile = () => {
   const [deletingSim, setDeletingSim] = useState(false);
   const [deletingPatient, setDeletingPatient] = useState(false);
   const [togglingSimId, setTogglingSimId] = useState<string | null>(null);
+  const [registeringConsent, setRegisteringConsent] = useState(false);
 
   const { data: patient, isLoading: loadingPatient, isError: patientError } = useQuery({
     queryKey: ['patient', id],
@@ -158,6 +160,24 @@ const PatientProfile = () => {
     }
   };
 
+  const handleRegisterConsent = async () => {
+    if (!id) return;
+    setRegisteringConsent(true);
+    try {
+      await recordPatientPhotoConsent(id);
+      await queryClient.invalidateQueries({ queryKey: ['patient', id] });
+      toast({ title: 'Consentimento registrado' });
+    } catch (e) {
+      toast({
+        title: 'Erro ao registrar consentimento',
+        description: getApiErrorMessage(e, 'Tente novamente.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setRegisteringConsent(false);
+    }
+  };
+
   const handleConfirmDeletePatient = async () => {
     if (!id) return;
     setDeletingPatient(true);
@@ -258,6 +278,30 @@ const PatientProfile = () => {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="border-t border-border pt-4 space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">Consentimento de foto</h3>
+            {patient.photoConsentAt ? (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                Registrado em{' '}
+                {new Date(patient.photoConsentAt).toLocaleString('pt-BR')}
+                {patient.photoConsentVersion ? ` · versão ${patient.photoConsentVersion}` : ''}
+              </p>
+            ) : (
+              <p className="text-xs text-amber-700 dark:text-amber-400">Pendente — necessário antes de simular.</p>
+            )}
+            <Link to="/legal/consentimento-paciente" {...legalDocumentLinkProps} className="text-xs text-primary hover:underline">
+              Ver modelo de consentimento
+            </Link>
+            <button
+              type="button"
+              onClick={() => void handleRegisterConsent()}
+              disabled={registeringConsent}
+              className="block text-xs font-medium text-primary hover:underline disabled:opacity-50"
+            >
+              {registeringConsent ? 'Registrando…' : 'Registrar consentimento agora'}
+            </button>
           </div>
 
           <div className="border-t border-border pt-4">

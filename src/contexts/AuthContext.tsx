@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { fetchMe, loginRequest, signupRequest, type AppAccountType, type AppUserDto } from '@/controllers/authApi';
+import { fetchMe, loginRequest, type AppAccountType, type AppUserDto } from '@/controllers/authApi';
 import { setAppAuthToken, getAppAuthToken } from '@/controllers/appApiClient';
 
 export interface User {
@@ -12,12 +12,18 @@ export interface User {
   firstAccess: boolean;
   subscriptionStatus?: string;
   trialEndsAt?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
   simulationCreditsRemaining: number;
   simulationMonthlyQuota: number;
   previewCreditsRemaining: number;
   previewMonthlyQuota: number;
   accountType: AppAccountType;
   partnerTestExpiresAt?: string | null;
+  termsAcceptedAt?: string;
+  privacyAcceptedAt?: string;
+  termsVersion?: string;
+  patientDataResponsibilityAckAt?: string;
 }
 
 function mapDto(u: AppUserDto): User {
@@ -31,12 +37,18 @@ function mapDto(u: AppUserDto): User {
     firstAccess: u.firstAccess === true,
     subscriptionStatus: u.subscriptionStatus,
     trialEndsAt: u.trialEndsAt,
+    currentPeriodEnd: u.currentPeriodEnd,
+    cancelAtPeriodEnd: u.cancelAtPeriodEnd,
     simulationCreditsRemaining: u.simulationCreditsRemaining ?? 0,
     simulationMonthlyQuota: u.simulationMonthlyQuota ?? 0,
     previewCreditsRemaining: u.previewCreditsRemaining ?? 0,
     previewMonthlyQuota: u.previewMonthlyQuota ?? 0,
     accountType: u.accountType === 'partner_test' ? 'partner_test' : 'official',
     partnerTestExpiresAt: u.partnerTestExpiresAt ?? null,
+    termsAcceptedAt: u.termsAcceptedAt,
+    privacyAcceptedAt: u.privacyAcceptedAt,
+    termsVersion: u.termsVersion,
+    patientDataResponsibilityAckAt: u.patientDataResponsibilityAckAt,
   };
 }
 
@@ -45,7 +57,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   authReady: boolean;
   login: (email: string, password: string) => Promise<User>;
-  signup: (name: string, clinic: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   setUserFromDto: (u: AppUserDto) => void;
   refreshMe: () => Promise<void>;
@@ -89,11 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return mapped;
   };
 
-  const signup = async (name: string, clinic: string, email: string, password: string) => {
-    const u = await signupRequest(name, clinic, email, password);
-    setUser(mapDto(u));
-  };
-
   const logout = () => {
     setAppAuthToken(null);
     setUser(null);
@@ -115,7 +121,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated: !!user,
         authReady,
         login,
-        signup,
         logout,
         setUserFromDto,
         refreshMe,

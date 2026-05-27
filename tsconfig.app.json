@@ -19,6 +19,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@legal/*": [
+        "../legal/*"
       ]
     },
     "skipLibCheck": true,

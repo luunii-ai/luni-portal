@@ -7,16 +7,18 @@ import { PartnerTestBanner } from '@/components/PartnerTestBanner';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { partnerTestLockState } from '@/lib/partnerTest';
+import { billingLockState, isTrialingOfficial } from '@/lib/billingLock';
 import { cn } from '@/lib/utils';
 
 const AppLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user } = useAuth();
   const partnerBanner = user?.accountType === 'partner_test';
-  const partnerLocked = partnerBanner && partnerTestLockState(user).locked;
-  /** Offset para header mobile fixo ficar abaixo da barra de teste. */
-  const mobileTopClass = partnerLocked ? 'top-14' : partnerBanner ? 'top-11' : 'top-0';
+  const trialingBanner = isTrialingOfficial(user);
+  const infoBanner = partnerBanner || trialingBanner;
+  const billingLocked = user ? billingLockState(user).locked : false;
+  /** Offset para header mobile fixo ficar abaixo da barra de aviso. */
+  const mobileTopClass = billingLocked ? 'top-14' : infoBanner ? 'top-11' : 'top-0';
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background">
@@ -71,9 +73,9 @@ const AppLayout = () => {
         <main
           className={cn(
             'ml-0 min-h-screen flex-1 xl:ml-64',
-            partnerLocked
+            billingLocked
               ? 'pt-[7.5rem] xl:pt-14'
-              : partnerBanner
+              : infoBanner
                 ? 'pt-[6.25rem] xl:pt-10'
                 : 'pt-14 xl:pt-0',
           )}

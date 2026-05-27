@@ -6,10 +6,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
-import { partnerTestLockState } from "@/lib/partnerTest";
+import { billingLockState } from "@/lib/billingLock";
+import { isTermsExemptPath, userHasAcceptedTerms } from "@/lib/termsAcceptance";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import NewSimulation from "./pages/NewSimulation";
 import SimulationResult from "./pages/SimulationResult";
@@ -23,6 +23,9 @@ import FirstAccessPassword from "./pages/FirstAccessPassword";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import LegalTermsPage from "./pages/legal/LegalTermsPage";
+import LegalPrivacyPage from "./pages/legal/LegalPrivacyPage";
+import LegalPatientConsentPage from "./pages/legal/LegalPatientConsentPage";
 
 const queryClient = new QueryClient();
 const FIRST_ACCESS_ROUTE = "/primeiro-acesso/alterar-senha";
@@ -44,7 +47,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (!user?.firstAccess && location.pathname === FIRST_ACCESS_ROUTE) {
     return <Navigate to="/dashboard" replace />;
   }
-  const lock = partnerTestLockState(user ?? null);
+  if (user && !userHasAcceptedTerms(user) && !isTermsExemptPath(location.pathname)) {
+    return <Navigate to="/configuracoes" replace />;
+  }
+  const lock = billingLockState(user ?? null);
   if (
     lock.locked &&
     user &&
@@ -67,7 +73,6 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/cadastro" element={<Signup />} />
               <Route path="/esqueci-senha" element={<ForgotPassword />} />
               <Route path="/redefinir-senha" element={<ResetPassword />} />
               <Route
@@ -75,6 +80,30 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <FirstAccessPassword />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/legal/termos"
+                element={
+                  <ProtectedRoute>
+                    <LegalTermsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/legal/privacidade"
+                element={
+                  <ProtectedRoute>
+                    <LegalPrivacyPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/legal/consentimento-paciente"
+                element={
+                  <ProtectedRoute>
+                    <LegalPatientConsentPage />
                   </ProtectedRoute>
                 }
               />

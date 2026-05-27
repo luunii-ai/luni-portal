@@ -24,3 +24,15 @@ export async function changePassword(body: ChangePasswordBody): Promise<AppUserD
   const { data } = await appApiClient.post<AppUserDto>('/me/password', body);
   return data;
 }
+
+export interface AcceptTermsBody {
+  termsVersion: string;
+  acceptTerms: boolean;
+  acceptPrivacy: boolean;
+  acceptPatientResponsibility: boolean;
+}
+
+export async function acceptTermsRequest(body: AcceptTermsBody): Promise<AppUserDto> {
+  const { data } = await appApiClient.post<AppUserDto>('/me/accept-terms', body);
+  return data;
+}

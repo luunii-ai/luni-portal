@@ -17,8 +17,16 @@ export async function ensurePatient(body: {
   name: string;
   email: string;
   phone: string;
+  recordPhotoConsent?: boolean;
 }): Promise<Patient> {
   const { data } = await appApiClient.post<Patient>('/patients/ensure', body);
+  return data;
+}
+
+export async function recordPatientPhotoConsent(id: string, consentVersion?: string): Promise<Patient> {
+  const { data } = await appApiClient.post<Patient>(`/patients/${id}/photo-consent`, {
+    consentVersion,
+  });
   return data;
 }
 

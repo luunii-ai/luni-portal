@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calculator, DollarSign, TrendingUp, Save } from 'lucide-react';
+import { Calculator, DollarSign, TrendingUp, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchProcedures } from '@/controllers/proceduresApi';
 import { fetchPricingBase, savePricingBase } from '@/controllers/pricingBasesApi';
 import { toast } from '@/components/ui/use-toast';
@@ -63,6 +63,7 @@ const PricingSimulator = () => {
   const [monthlyPatients, setMonthlyPatients] = useState(30);
   const [errorRate, setErrorRate] = useState(15);
   const [showAdditionalCosts, setShowAdditionalCosts] = useState(false);
+  const [monthlyProjectionOpen, setMonthlyProjectionOpen] = useState(false);
   const [additionalCosts, setAdditionalCosts] = useState<AdditionalCosts>(() => getDefaultAdditionalCosts('botox'));
 
   const { data: savedBase } = useQuery({
@@ -378,43 +379,6 @@ const PricingSimulator = () => {
       </div>
 
       <div className="ds-feature-card space-y-4 p-6 shadow-card ds-transition-surface">
-          <h3 className="font-display font-semibold text-foreground text-sm flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            Projeção Mensal
-          </h3>
-          <InputField
-            label="Pacientes/mês (usado na projeção)"
-            value={monthlyPatients}
-            onChange={setMonthlyPatients}
-            min={1}
-            max={500}
-          />
-          {/* <InputField
-            label={`Taxa de variação mensal (%)${actualUnits === estimatedUnits ? ' (sem efeito enquanto real = estimado)' : ''}`}
-            value={errorRate}
-            onChange={setErrorRate}
-            min={0}
-            max={100}
-          /> */}
-          <div className="space-y-2">
-            <MetricRow label="Preço por procedimento usado" value={formatCurrencyPrecise(totalProcedurePrice)} />
-            <MetricRow label="Pacientes/mês usados no cálculo" value={`${monthlyPatients}`} />
-            <MetricRow label="Faturamento mensal" value={formatCurrency(monthlyRevenue)} />
-            <MetricRow label="Custo base (estimado)" value={formatCurrency(monthlyCostIdeal)} />
-            <MetricRow label="Custo com variação real" value={formatCurrency(monthlyCostReal)} highlight={monthlyCostReal > monthlyCostIdeal ? 'danger' : 'success'} />
-            <div className="border-t border-border my-2" />
-            <MetricRow label="Lucro base (estimado)" value={formatCurrency(monthlyProfitIdeal)} highlight="success" />
-            <MetricRow label="Lucro com variação real" value={formatCurrency(monthlyProfitReal)} highlight={monthlyProfitReal < monthlyProfitIdeal ? 'warning' : 'success'} />
-            <MetricRow label="Impacto mensal da variação" value={formatCurrency(monthlyLoss)} highlight={monthlyLoss > 0 ? 'danger' : 'success'} />
-            <MetricRow label={`Pacientes com variação (${effectiveErrorRate}%)`} value={`${patientsWithError} de ${monthlyPatients}`} />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Fórmula do faturamento: {formatCurrencyPrecise(totalProcedurePrice)} x {monthlyPatients} ={' '}
-            <strong className="text-foreground">{formatCurrency(monthlyRevenue)}</strong>.
-          </p>
-      </div>
-
-      <div className="ds-feature-card space-y-4 p-6 shadow-card ds-transition-surface">
         <h3 className="font-display font-semibold text-foreground text-sm flex items-center gap-2">
           <DollarSign className="w-4 h-4 text-primary" />
           Sugestão de Preço Total do Procedimento
@@ -479,7 +443,53 @@ const PricingSimulator = () => {
         </div>
       </div>
 
-      <div className="ds-feature-card space-y-4 p-6 shadow-card ds-transition-surface">
+      <div className="ds-feature-card shadow-card ds-transition-surface overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setMonthlyProjectionOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-3 p-6 text-left hover:bg-secondary/30 transition-colors"
+          aria-expanded={monthlyProjectionOpen}
+        >
+          <h3 className="font-display font-semibold text-foreground text-sm flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            Projeção Mensal
+          </h3>
+          {monthlyProjectionOpen ? (
+            <ChevronUp className="w-4 h-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
+          )}
+        </button>
+        {monthlyProjectionOpen && (
+          <div className="space-y-4 border-t border-border px-6 pb-6 pt-4">
+            <InputField
+              label="Pacientes/mês (usado na projeção)"
+              value={monthlyPatients}
+              onChange={setMonthlyPatients}
+              min={1}
+              max={500}
+            />
+            <div className="space-y-2">
+              <MetricRow label="Preço por procedimento usado" value={formatCurrencyPrecise(totalProcedurePrice)} />
+              <MetricRow label="Pacientes/mês usados no cálculo" value={`${monthlyPatients}`} />
+              <MetricRow label="Faturamento mensal" value={formatCurrency(monthlyRevenue)} />
+              <MetricRow label="Custo base (estimado)" value={formatCurrency(monthlyCostIdeal)} />
+              <MetricRow label="Custo com variação real" value={formatCurrency(monthlyCostReal)} highlight={monthlyCostReal > monthlyCostIdeal ? 'danger' : 'success'} />
+              <div className="border-t border-border my-2" />
+              <MetricRow label="Lucro base (estimado)" value={formatCurrency(monthlyProfitIdeal)} highlight="success" />
+              <MetricRow label="Lucro com variação real" value={formatCurrency(monthlyProfitReal)} highlight={monthlyProfitReal < monthlyProfitIdeal ? 'warning' : 'success'} />
+              <MetricRow label="Impacto mensal da variação" value={formatCurrency(monthlyLoss)} highlight={monthlyLoss > 0 ? 'danger' : 'success'} />
+              <MetricRow label={`Pacientes com variação (${effectiveErrorRate}%)`} value={`${patientsWithError} de ${monthlyPatients}`} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Fórmula do faturamento: {formatCurrencyPrecise(totalProcedurePrice)} x {monthlyPatients} ={' '}
+              <strong className="text-foreground">{formatCurrency(monthlyRevenue)}</strong>.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* <div className="ds-feature-card space-y-4 p-6 shadow-card ds-transition-surface">
         <h3 className="font-display font-semibold text-foreground text-sm flex items-center gap-2">
           <Calculator className="w-4 h-4 text-primary" />
           Simulação Rápida pela Margem
@@ -509,7 +519,7 @@ const PricingSimulator = () => {
             <MetricRow label={`Redução da margem (+${projectionMaxExtra})`} value={`${quickProjectionMaxMarginLoss.toFixed(1)} p.p.`} highlight={quickProjectionMaxMarginLoss > 0 ? 'danger' : undefined} />
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

@@ -42,6 +42,8 @@ export interface EnhanceImageParams {
   practiceProfile?: EnhancePracticeProfile;
   /** Opcional; enviado ao agente como `detalhes` → `{descricao_usuario}` (clinic ou surgeon). */
   detalhes?: string;
+  /** Paciente vinculado — exige consentimento registrado no backend. */
+  patientId?: string;
 }
 
 function clampIntensidadePct(n: number): number {
@@ -278,8 +280,15 @@ export interface FinalizePreviewResult {
   r2AfterUrl?: string;
 }
 
+function appendPatientConsentFields(formData: FormData, patientId?: string) {
+  const id = patientId?.trim();
+  if (!id) return;
+  formData.append('patient_id', id);
+  formData.append('patient_consent_ack', '1');
+}
+
 export async function enhancePreview(params: EnhanceImageParams): Promise<EnhanceImageResult> {
-  const { file, tipo_procedimento, regioes, intensidade, intensidadePct, practiceProfile, detalhes } =
+  const { file, tipo_procedimento, regioes, intensidade, intensidadePct, practiceProfile, detalhes, patientId } =
     params;
   const formData = new FormData();
   formData.append('image', file, file instanceof File ? file.name : 'upload.jpg');
@@ -297,6 +306,7 @@ export async function enhancePreview(params: EnhanceImageParams): Promise<Enhanc
   }
   const d = detalhes?.trim();
   if (d) formData.append('detalhes', d);
+  appendPatientConsentFields(formData, patientId);
 
   const url = `${getAppApiBaseUrl()}/v1/enhance?preview=1&format=json`;
   const token = getAppAuthToken();
@@ -348,7 +358,7 @@ export async function finalizePreview(params: {
 }
 
 export async function enhanceImage(params: EnhanceImageParams): Promise<EnhanceImageResult> {
-  const { file, tipo_procedimento, regioes, intensidade, intensidadePct, practiceProfile, detalhes } =
+  const { file, tipo_procedimento, regioes, intensidade, intensidadePct, practiceProfile, detalhes, patientId } =
     params;
   const formData = new FormData();
   formData.append('image', file, file instanceof File ? file.name : 'upload.jpg');
@@ -366,6 +376,7 @@ export async function enhanceImage(params: EnhanceImageParams): Promise<EnhanceI
   }
   const d = detalhes?.trim();
   if (d) formData.append('detalhes', d);
+  appendPatientConsentFields(formData, patientId);
 
   const url = `${getAppApiBaseUrl()}/v1/enhance?format=json`;
   const token = getAppAuthToken();
