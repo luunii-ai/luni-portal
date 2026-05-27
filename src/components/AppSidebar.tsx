@@ -18,7 +18,8 @@ export interface AppSidebarContentProps {
   onNavigate?: () => void;
 }
 
-function simulationCreditsStyle(remaining: number, total: number) {
+/** Tons por créditos restantes (simulações e pré-vias mensais): vermelho ≤5; âmbar ≤ metade do total; padrão acima disso. */
+function quotaRemainingStyle(remaining: number, total: number) {
   if (remaining <= 5) {
     return {
       tone: 'critical' as const,
@@ -54,10 +55,14 @@ export function AppSidebarContent({ onNavigate }: AppSidebarContentProps) {
     user && isPartnerTest ? Math.max(user.simulationCreditsRemaining, 10) : 0;
   const cr =
     user && isPartnerTest
-      ? simulationCreditsStyle(user.simulationCreditsRemaining, partnerTestBarDen)
+      ? quotaRemainingStyle(user.simulationCreditsRemaining, partnerTestBarDen)
       : user && user.simulationMonthlyQuota > 0
-        ? simulationCreditsStyle(user.simulationCreditsRemaining, user.simulationMonthlyQuota)
+        ? quotaRemainingStyle(user.simulationCreditsRemaining, user.simulationMonthlyQuota)
         : null;
+  const previewCr =
+    user && user.previewMonthlyQuota > 0
+      ? quotaRemainingStyle(user.previewCreditsRemaining, user.previewMonthlyQuota)
+      : null;
 
   return (
     <>
@@ -182,19 +187,31 @@ export function AppSidebarContent({ onNavigate }: AppSidebarContentProps) {
             </div>
           </div>
         )}
-        {user && user.previewMonthlyQuota > 0 && (
-          <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
-            <Eye className="h-4 w-4 shrink-0 text-primary" />
+        {user && user.previewMonthlyQuota > 0 && previewCr && (
+          <div
+            className={cn(
+              'flex items-center gap-2 rounded-xl border bg-muted/20 px-3 py-2',
+              previewCr.tone === 'critical' && 'border-red-500/40',
+              previewCr.tone === 'warning' && 'border-amber-500/40',
+              previewCr.tone === 'ok' && 'border-border/60',
+            )}
+          >
+            <Eye className={cn('h-4 w-4 shrink-0', previewCr.iconClass)} aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium">
-                <span className="text-foreground">{user.previewCreditsRemaining} / {user.previewMonthlyQuota}</span>
+                <span className={previewCr.valueClass}>
+                  {user.previewCreditsRemaining} / {user.previewMonthlyQuota}
+                </span>
                 <span className="ml-1 font-normal text-muted-foreground">prévias</span>
               </p>
               <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-border/60">
                 <div
-                  className="h-full rounded-full bg-primary transition-all"
+                  className={cn('h-full rounded-full transition-all', previewCr.barClass)}
                   style={{
-                    width: `${Math.min(100, Math.round((user.previewCreditsRemaining / user.previewMonthlyQuota) * 100))}%`,
+                    width: `${Math.min(
+                      100,
+                      Math.round((user.previewCreditsRemaining / user.previewMonthlyQuota) * 100),
+                    )}%`,
                   }}
                 />
               </div>

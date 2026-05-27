@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calculator, DollarSign, TrendingUp, Save } from 'lucide-react';
 import { fetchProcedures } from '@/controllers/proceduresApi';
@@ -49,8 +49,8 @@ const PricingSimulator = () => {
   const queryClient = useQueryClient();
 
   const { data: procedures = [], isLoading: proceduresLoading } = useQuery({
-    queryKey: ['procedures'],
-    queryFn: fetchProcedures,
+    queryKey: ['procedures', 'clinic'],
+    queryFn: () => fetchProcedures('clinic'),
   });
 
   const [selectedProcedureId, setSelectedProcedureId] = useState('botox');
@@ -109,7 +109,7 @@ const PricingSimulator = () => {
   const unitLabel = selectedProcedureId === 'botox' ? 'pontos' : 'unidades';
   const unitShortLabel = selectedProcedureId === 'botox' ? 'pt' : 'unid';
 
-  const onProcedureChange = (nextProcedureId: string) => {
+  const onProcedureChange = useCallback((nextProcedureId: string) => {
     // Reset to defaults first; if a saved base exists for the new procedure,
     // the useEffect watching `savedBase` will overwrite these values.
     setSelectedProcedureId(nextProcedureId);
@@ -122,7 +122,14 @@ const PricingSimulator = () => {
       setBotoxVialPrice(DEFAULT_BOTOX_VIAL_PRICE);
       setBotoxPointsPerVial(DEFAULT_BOTOX_POINTS_PER_VIAL);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (proceduresLoading || procedures.length === 0) return;
+    if (!procedures.some((p) => p.id === selectedProcedureId)) {
+      onProcedureChange(procedures[0].id);
+    }
+  }, [proceduresLoading, procedures, selectedProcedureId, onProcedureChange]);
 
   const safePointsPerVial = Math.max(botoxPointsPerVial, 1);
   const derivedBotoxCostPerPoint = botoxVialPrice / safePointsPerVial;
@@ -255,7 +262,8 @@ const PricingSimulator = () => {
           Simulador de precificação
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Simule margem desejada, preço total do procedimento e impacto de erro de aplicação
+          Simule margem desejada, preço total do procedimento e impacto de erro de aplicação. Lista limitada a
+          procedimentos de clínica estética (harmonização e injetáveis).
         </p>
       </div>
 

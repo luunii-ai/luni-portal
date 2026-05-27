@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { storeEnhanceAfterImage, storeEnhanceMeta } from '@/lib/enhanceResultStorage';
 import { persistSimulationFlow } from '@/lib/simulationFlowStorage';
+import { buildEnhanceRegionsText } from '@/lib/enhanceProcedureRegions';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -79,7 +80,6 @@ const NewSimulation = () => {
   const [patientEmail, setPatientEmail] = useState('');
   const [selectedProcedures, setSelectedProcedures] = useState<string[]>([]);
   const [mammoplastiaSiliconeAck, setMammoplastiaSiliconeAck] = useState(false);
-  const [regioes, setRegioes] = useState('');
   const [detalhesResultado, setDetalhesResultado] = useState('');
   const [intensity, setIntensity] = useState(50);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -287,8 +287,9 @@ const NewSimulation = () => {
         const result = await enhanceImage({
           file: imageFile,
           tipo_procedimento: tiposApi,
-          regioes: regioes.trim(),
+          regioes: enhanceRegioesText.trim(),
           intensidade: intensityPercentToApiLabel(intensity),
+          intensidadePct: intensity,
           practiceProfile: practiceProfile ?? 'clinic',
           detalhes: detalhesResultado.trim() || undefined,
         });
@@ -335,36 +336,40 @@ const NewSimulation = () => {
       persistSimulationFlow(flowSnapshot);
       void refreshMe();
 
-      navigate({
-        pathname: '/resultado-simulacao',
-        search: resultPairId ? `?pairId=${encodeURIComponent(resultPairId)}` : '',
-        state: {
-          practiceProfile: practiceProfile ?? undefined,
-          procedures: selectedProcedures,
-          procedure: selectedProcedures[0],
-          intensity,
-          ...(resultPairId ? {} : { image: uploadedImage }),
-          patientMode,
-          selectedPatientId:
-            patientMode === 'existing' && selectedPatientId ? selectedPatientId : undefined,
-          ...(patientMode === 'existing' && selectedPatientId
-            ? { patientId: selectedPatientId }
-            : {}),
-          pairId: resultPairId,
-          r2OriginalUrl: resultR2OriginalUrl,
-          r2AfterUrl: resultR2AfterUrl,
-          enhanceAfterFromSession: storedOk,
-          enhanceMetaFromSession: true,
-          ...(storedOk ? {} : { afterImage: afterDataUrl }),
-          patientDraft: flowSnapshot.patientDraft,
-          patient: {
-            name: patientName.trim(),
-            phone: phoneDigits,
-            email: patientEmail.trim(),
-          },
-          ...(detalhesResultado.trim() ? { detalhes: detalhesResultado.trim() } : {}),
+      navigate(
+        {
+          pathname: '/resultado-simulacao',
+          search: resultPairId ? `?pairId=${encodeURIComponent(resultPairId)}` : '',
         },
-      });
+        {
+          state: {
+            practiceProfile: practiceProfile ?? undefined,
+            procedures: selectedProcedures,
+            procedure: selectedProcedures[0],
+            intensity,
+            ...(resultPairId ? {} : { image: uploadedImage }),
+            patientMode,
+            selectedPatientId:
+              patientMode === 'existing' && selectedPatientId ? selectedPatientId : undefined,
+            ...(patientMode === 'existing' && selectedPatientId
+              ? { patientId: selectedPatientId }
+              : {}),
+            pairId: resultPairId,
+            r2OriginalUrl: resultR2OriginalUrl,
+            r2AfterUrl: resultR2AfterUrl,
+            enhanceAfterFromSession: storedOk,
+            enhanceMetaFromSession: true,
+            ...(storedOk ? {} : { afterImage: afterDataUrl }),
+            patientDraft: flowSnapshot.patientDraft,
+            patient: {
+              name: patientName.trim(),
+              phone: phoneDigits,
+              email: patientEmail.trim(),
+            },
+            ...(detalhesResultado.trim() ? { detalhes: detalhesResultado.trim() } : {}),
+          },
+        },
+      );
     } catch (err) {
       toast({
         title: 'Falha na simulação',
@@ -394,8 +399,9 @@ const NewSimulation = () => {
       const result = await enhancePreview({
         file: imageFile,
         tipo_procedimento: tiposApi,
-        regioes: regioes.trim(),
+        regioes: enhanceRegioesText.trim(),
         intensidade: intensityPercentToApiLabel(intensity),
+        intensidadePct: intensity,
         practiceProfile: practiceProfile ?? 'clinic',
         detalhes: detalhesResultado.trim() || undefined,
       });
@@ -429,7 +435,6 @@ const NewSimulation = () => {
     setSelectedProcedures([]);
     setMammoplastiaSiliconeAck(false);
     setDetalhesResultado('');
-    setRegioes('');
     setIntensity(50);
     setPreviewImage(null);
     setPreviewIntensity(null);
@@ -440,6 +445,14 @@ const NewSimulation = () => {
       setMammoplastiaSiliconeAck(false);
     }
   }, [selectedProcedures]);
+
+  const enhanceRegioesText = useMemo(() => {
+    if (!practiceProfile || selectedProcedures.length === 0) return '';
+    return buildEnhanceRegionsText(selectedProcedures, {
+      practiceProfile,
+      clinicProcedures,
+    });
+  }, [practiceProfile, selectedProcedures, clinicProcedures]);
 
   const selectedProcedureLabels = useMemo(() => {
     if (practiceProfile === 'surgeon') {
@@ -457,7 +470,7 @@ const NewSimulation = () => {
   const steps = [
     { num: 1, label: 'Enviar Foto' },
     { num: 2, label: 'Procedimento' },
-    { num: 3, label: 'Regiões' },
+    { num: 3, label: 'Expectativa' },
     { num: 4, label: 'Intensidade' },
     { num: 5, label: 'Gerar' },
   ];
@@ -867,27 +880,20 @@ const NewSimulation = () => {
           </div>
         )}
 
-        {/* Step 3: Regiões */}
+        {/* Step 3: detalhes opcionais — regiões vêm do catálogo de procedimentos */}
         {step === 3 && (
           <div className="space-y-6">
-            <h2 className="font-display text-lg font-semibold text-foreground">Regiões do procedimento</h2>
+            <h2 className="font-display text-lg font-semibold text-foreground">Expectativa e detalhes</h2>
             <p className="text-sm text-muted-foreground">
-              Descreva as regiões a tratar (ex.: testa, lábios e perfil). Isso será enviado para a IA gerar o resultado.
+              As <span className="font-medium text-foreground">regiões tratadas</span> são definidas automaticamente pelos procedimentos que você escolheu — não é preciso repetir.
+              Use o campo abaixo só se quiser refinar o resultado (formato, lateralidade, sutileza, etc.).
             </p>
-            <div>
-              <label htmlFor="regioes-textarea" className="text-xs text-muted-foreground mb-1 block">
-                Regiões *
-              </label>
-              <textarea
-                id="regioes-textarea"
-                value={regioes}
-                onChange={(e) => setRegioes(e.target.value)}
-                placeholder="Ex.: testa, lábios e perfil"
-                rows={4}
-                disabled={flowLocked}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[100px] disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
+            {enhanceRegioesText.trim() ? (
+              <p className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Áreas-alvo enviadas para a IA:</span>{' '}
+                {enhanceRegioesText}
+              </p>
+            ) : null}
             <div>
               <label htmlFor="detalhes-resultado-textarea" className="text-xs text-muted-foreground mb-1 block">
                 Detalhes / resultado desejado
@@ -1053,7 +1059,10 @@ const NewSimulation = () => {
                 Procedimento(s):{' '}
                 <span className="font-medium text-foreground">{selectedProcedureLabels || '—'}</span>
               </p>
-              <p className="text-sm text-muted-foreground">Regiões: <span className="font-medium text-foreground">{regioes.trim() || '—'}</span></p>
+              <p className="text-sm text-muted-foreground">
+                Regiões (automáticas):{' '}
+                <span className="font-medium text-foreground">{enhanceRegioesText.trim() || '—'}</span>
+              </p>
               {detalhesResultado.trim() ? (
                 <p className="text-sm text-muted-foreground">
                   Detalhes desejados:{' '}
@@ -1186,8 +1195,7 @@ const NewSimulation = () => {
                       clinicProcedures.length === 0 ||
                       selectedProcedures.length === 0
                     : selectedProcedures.length === 0 ||
-                      (mammoplastiaSelected && !mammoplastiaSiliconeAck))) ||
-                (step === 3 && !regioes.trim())
+                      (mammoplastiaSelected && !mammoplastiaSiliconeAck)))
               }
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-medium shadow-primary hover:opacity-90 disabled:opacity-30 transition-all"
             >

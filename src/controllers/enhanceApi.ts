@@ -36,10 +36,17 @@ export interface EnhanceImageParams {
   tipo_procedimento: string[];
   regioes: string;
   intensidade: string;
+  /** 0–100 do slider do portal; enviado ao agente como `intensidade_pct` para calibragem fina (além do rótulo qualitativo). */
+  intensidadePct?: number;
   /** Perfil do prompt no agente: injetáveis vs cirúrgico. Padrão: clinic. */
   practiceProfile?: EnhancePracticeProfile;
   /** Opcional; enviado ao agente como `detalhes` → `{descricao_usuario}` (clinic ou surgeon). */
   detalhes?: string;
+}
+
+function clampIntensidadePct(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 export interface EnhanceApiPoint {
@@ -272,7 +279,8 @@ export interface FinalizePreviewResult {
 }
 
 export async function enhancePreview(params: EnhanceImageParams): Promise<EnhanceImageResult> {
-  const { file, tipo_procedimento, regioes, intensidade, practiceProfile, detalhes } = params;
+  const { file, tipo_procedimento, regioes, intensidade, intensidadePct, practiceProfile, detalhes } =
+    params;
   const formData = new FormData();
   formData.append('image', file, file instanceof File ? file.name : 'upload.jpg');
   for (const tipo of tipo_procedimento) {
@@ -281,6 +289,9 @@ export async function enhancePreview(params: EnhanceImageParams): Promise<Enhanc
   }
   formData.append('regioes', regioes);
   formData.append('intensidade', intensidade);
+  if (intensidadePct != null && Number.isFinite(intensidadePct)) {
+    formData.append('intensidade_pct', String(clampIntensidadePct(intensidadePct)));
+  }
   if (practiceProfile) {
     formData.append('practice_profile', practiceProfile);
   }
@@ -337,7 +348,8 @@ export async function finalizePreview(params: {
 }
 
 export async function enhanceImage(params: EnhanceImageParams): Promise<EnhanceImageResult> {
-  const { file, tipo_procedimento, regioes, intensidade, practiceProfile, detalhes } = params;
+  const { file, tipo_procedimento, regioes, intensidade, intensidadePct, practiceProfile, detalhes } =
+    params;
   const formData = new FormData();
   formData.append('image', file, file instanceof File ? file.name : 'upload.jpg');
   for (const tipo of tipo_procedimento) {
@@ -346,6 +358,9 @@ export async function enhanceImage(params: EnhanceImageParams): Promise<EnhanceI
   }
   formData.append('regioes', regioes);
   formData.append('intensidade', intensidade);
+  if (intensidadePct != null && Number.isFinite(intensidadePct)) {
+    formData.append('intensidade_pct', String(clampIntensidadePct(intensidadePct)));
+  }
   if (practiceProfile) {
     formData.append('practice_profile', practiceProfile);
   }

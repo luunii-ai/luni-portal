@@ -12,6 +12,8 @@ export interface PlasticSurgeryProcedureDef {
   apiTipo: string;
   /** Exige confirmação explícita de prótese de silicone antes de gerar. */
   requiresSiliconeAck: boolean;
+  /** Regiões padrão PT para campo `regioes` no enhance (alinhado ao catálogo do back-end). */
+  defaultEnhanceRegions: string;
 }
 
 export const plasticSurgeryProcedures: PlasticSurgeryProcedureDef[] = [
@@ -22,6 +24,7 @@ export const plasticSurgeryProcedures: PlasticSurgeryProcedureDef[] = [
     icon: '💎',
     apiTipo: 'Lipo HD',
     requiresSiliconeAck: false,
+    defaultEnhanceRegions: 'abdômen, flancos e definição de contornos corporais',
   },
   {
     id: 'papada',
@@ -30,6 +33,7 @@ export const plasticSurgeryProcedures: PlasticSurgeryProcedureDef[] = [
     icon: '✨',
     apiTipo: 'Papada',
     requiresSiliconeAck: false,
+    defaultEnhanceRegions: 'região submentoniana, pescoço e transição cervical',
   },
   {
     id: 'lifting-braco',
@@ -38,6 +42,7 @@ export const plasticSurgeryProcedures: PlasticSurgeryProcedureDef[] = [
     icon: '💪',
     apiTipo: 'Lifting de braço',
     requiresSiliconeAck: false,
+    defaultEnhanceRegions: 'braços, terços médio e proximal e axilas',
   },
   {
     id: MAMMOPLASTY_PROCEDURE_ID,
@@ -46,6 +51,7 @@ export const plasticSurgeryProcedures: PlasticSurgeryProcedureDef[] = [
     icon: '💗',
     apiTipo: 'Mamoplastia (prótese de silicone)',
     requiresSiliconeAck: true,
+    defaultEnhanceRegions: 'mamas',
   },
   {
     id: 'rinoplastia',
@@ -54,6 +60,7 @@ export const plasticSurgeryProcedures: PlasticSurgeryProcedureDef[] = [
     icon: '👃',
     apiTipo: 'Rinoplastia',
     requiresSiliconeAck: false,
+    defaultEnhanceRegions: 'nariz, ponta nasal e dorso',
   },
   {
     id: 'otoplastia',
@@ -62,6 +69,7 @@ export const plasticSurgeryProcedures: PlasticSurgeryProcedureDef[] = [
     icon: '👂',
     apiTipo: 'Otoplastia (orelha)',
     requiresSiliconeAck: false,
+    defaultEnhanceRegions: 'pavilhões auriculares e orelhas',
   },
 ];
 
