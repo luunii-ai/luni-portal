@@ -40,6 +40,8 @@ export interface Procedure {
   pricePerPoint: number;
   /** Escopo no catálogo do back-end (clínica vs cirurgião); ausente em respostas antigas. */
   practiceProfileScope?: 'clinic' | 'surgeon';
+  /** Regiões anatômicas padrão em PT para o prompt (`regioes` na API enhance). */
+  defaultEnhanceRegions?: string;
 }
 
 export const botoxFacialPoints = [
