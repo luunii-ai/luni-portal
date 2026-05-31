@@ -10,6 +10,7 @@ export type BillingLockReason =
   | 'subscription_canceled';
 
 export type BillingLockUserShape = PartnerTestUserShape & {
+  subscriptionBillingBypass?: boolean;
   subscriptionStatus?: string;
   trialEndsAt?: string | null;
   currentPeriodEnd?: string | null;
@@ -26,7 +27,8 @@ export function subscriptionLockState(user: BillingLockUserShape | null): {
   locked: boolean;
   reason?: 'payment_overdue' | 'subscription_canceled';
 } {
-  if (!user || user.accountType === 'partner_test') return { locked: false };
+  if (!user || user.subscriptionBillingBypass) return { locked: false };
+  if (user.accountType === 'partner_test') return { locked: false };
 
   const status = String(user.subscriptionStatus || '').toLowerCase();
 
@@ -54,6 +56,10 @@ export function billingLockState(user: BillingLockUserShape | null): {
   locked: boolean;
   reason: BillingLockReason | null;
 } {
+  if (user?.subscriptionBillingBypass) {
+    return { locked: false, reason: null };
+  }
+
   const partner = partnerTestLockState(user);
   if (partner.locked) {
     return {

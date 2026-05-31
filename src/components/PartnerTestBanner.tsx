@@ -10,7 +10,7 @@ function formatExpiry(iso: string | null | undefined): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-/** Barra global para contas parceiro (teste), trial ou assinatura bloqueada. */
+/** Barra global para contas admin, parceiro (teste), trial ou assinatura bloqueada. */
 export function PartnerTestBanner() {
   const { user } = useAuth();
   if (!user) return null;
@@ -18,6 +18,19 @@ export function PartnerTestBanner() {
   const billing = billingLockState(user);
   const partner = partnerTestLockState(user);
   const isPartnerTest = user.accountType === 'partner_test';
+
+  if (user.subscriptionBillingBypass) {
+    return (
+      <div
+        className="border-b border-violet-500/45 bg-violet-950/90 px-4 py-2 text-center text-sm text-violet-50"
+        role="status"
+      >
+        <span className="font-semibold">Conta administrador</span>
+        <span className="mx-2 opacity-60">·</span>
+        <span>Acesso interno</span>
+      </div>
+    );
+  }
 
   if (billing.locked && billing.reason === 'payment_overdue') {
     return (

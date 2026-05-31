@@ -3,6 +3,7 @@ import { fetchMe, loginRequest, type AppAccountType, type AppUserDto } from '@/c
 import { setAppAuthToken, getAppAuthToken } from '@/controllers/appApiClient';
 
 export interface User {
+  id?: string;
   name: string;
   email: string;
   clinic: string;
@@ -14,6 +15,7 @@ export interface User {
   trialEndsAt?: string;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
+  subscriptionBillingBypass?: boolean;
   simulationCreditsRemaining: number;
   simulationMonthlyQuota: number;
   previewCreditsRemaining: number;
@@ -28,6 +30,7 @@ export interface User {
 
 function mapDto(u: AppUserDto): User {
   return {
+    id: u.id,
     name: u.name,
     email: u.email,
     clinic: u.clinic || '',
@@ -39,6 +42,7 @@ function mapDto(u: AppUserDto): User {
     trialEndsAt: u.trialEndsAt,
     currentPeriodEnd: u.currentPeriodEnd,
     cancelAtPeriodEnd: u.cancelAtPeriodEnd,
+    subscriptionBillingBypass: u.subscriptionBillingBypass === true,
     simulationCreditsRemaining: u.simulationCreditsRemaining ?? 0,
     simulationMonthlyQuota: u.simulationMonthlyQuota ?? 0,
     previewCreditsRemaining: u.previewCreditsRemaining ?? 0,

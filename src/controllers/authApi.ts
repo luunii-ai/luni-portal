@@ -3,6 +3,7 @@ import { appApiClient, setAppAuthToken } from '@/controllers/appApiClient';
 export type AppAccountType = 'official' | 'partner_test';
 
 export interface AppUserDto {
+  id?: string;
   name: string;
   email: string;
   clinic: string;
@@ -14,6 +15,7 @@ export interface AppUserDto {
   trialEndsAt?: string;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
+  subscriptionBillingBypass?: boolean;
   simulationCreditsRemaining?: number;
   simulationMonthlyQuota?: number;
   previewCreditsRemaining?: number;

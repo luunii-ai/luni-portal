@@ -13,9 +13,10 @@ import { cn } from '@/lib/utils';
 const AppLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user } = useAuth();
+  const adminBanner = user?.subscriptionBillingBypass === true;
   const partnerBanner = user?.accountType === 'partner_test';
   const trialingBanner = isTrialingOfficial(user);
-  const infoBanner = partnerBanner || trialingBanner;
+  const infoBanner = adminBanner || partnerBanner || trialingBanner;
   const billingLocked = user ? billingLockState(user).locked : false;
   /** Offset para header mobile fixo ficar abaixo da barra de aviso. */
   const mobileTopClass = billingLocked ? 'top-14' : infoBanner ? 'top-11' : 'top-0';
