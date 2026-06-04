@@ -23,6 +23,7 @@ import { downloadEnhanceAfterAsBlob, fetchEnhancePairImages } from '@/controller
 import { fetchPricingBase } from '@/controllers/pricingBasesApi';
 import { getStoredEnhanceAfterImage, getStoredEnhanceMeta } from '@/lib/enhanceResultStorage';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
+import { usePhoneReuseConfirmation } from '@/hooks/usePhoneReuseConfirmation';
 import { readSimulationFlow, clearSimulationFlow } from '@/lib/simulationFlowStorage';
 import patientBefore from '@/assets/patient-before.jpg';
 import patientAfter from '@/assets/patient-after.jpg';
@@ -115,6 +116,7 @@ const SimulationResult = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { refreshMe } = useAuth();
+  const { confirmIfPhoneExists, phoneReuseDialog } = usePhoneReuseConfirmation();
   const [searchParams] = useSearchParams();
 
   const locationState = (location.state ?? {}) as ResultLocationState;
@@ -242,6 +244,13 @@ const SimulationResult = () => {
       let patientIdToUse = resolvedPatientId;
 
       if (!patientIdToUse) {
+        if (phoneForApi) {
+          const phoneOk = await confirmIfPhoneExists(
+            phoneForApi,
+            (draft.name || 'Paciente').trim() || 'Paciente',
+          );
+          if (!phoneOk) return;
+        }
         const ensured = await ensurePatient({
           name: (draft.name || 'Paciente').trim() || 'Paciente',
           email: (draft.email ?? '').trim(),
@@ -532,6 +541,8 @@ const SimulationResult = () => {
           {saving ? 'Salvando…' : 'Salvar simulação'}
         </button>
       </div>
+
+      {phoneReuseDialog}
     </div>
   );
 };

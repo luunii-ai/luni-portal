@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Lock, Building2, User, CreditCard, ShieldCheck } from 'lucide-react';
+import { Save, Building2, User, CreditCard, ShieldCheck } from 'lucide-react';
 import { patchMe, acceptTermsRequest } from '@/controllers/userApi';
 import { fetchCurrentSubscription, type CurrentSubscriptionDto } from '@/controllers/subscriptionApi';
 import { getApiErrorMessage } from '@/controllers/apiErrors';
@@ -286,14 +286,6 @@ const SettingsPage = () => {
           </label>
         </div>
       </div> */}
-
-      <div className="bg-card rounded-xl p-6 shadow-card space-y-4">
-        <h2 className="font-display font-semibold text-foreground flex items-center gap-2">
-          <Lock className="w-4 h-4 text-primary" />
-          Alterar Senha
-        </h2>
-        <p className="text-sm text-muted-foreground">Em breve: alteração de senha pela API.</p>
-      </div>
 
       <div className="bg-card rounded-xl p-6 shadow-card space-y-4">
         <h2 className="font-display font-semibold text-foreground flex items-center gap-2">

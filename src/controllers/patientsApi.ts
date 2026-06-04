@@ -13,6 +13,18 @@ export async function fetchPatient(id: string): Promise<Patient> {
   return data;
 }
 
+export type PatientPhoneLookup = {
+  exists: boolean;
+  patient?: Patient;
+};
+
+export async function checkPatientPhone(phone: string): Promise<PatientPhoneLookup> {
+  const { data } = await appApiClient.get<PatientPhoneLookup>('/patients/phone-lookup', {
+    params: { phone },
+  });
+  return data;
+}
+
 export async function ensurePatient(body: {
   name: string;
   email: string;

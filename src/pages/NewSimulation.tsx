@@ -1,10 +1,10 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Upload, Camera, Check, ArrowRight, ArrowLeft, UserPlus, Users, Building2, Scissors } from 'lucide-react';
+import { Upload, Camera, Check, ArrowRight, ArrowLeft, UserPlus, Users, Building2, Scissors, AlertTriangle } from 'lucide-react';
 import { brandMark } from '@/assets/brandAssets';
 import { fetchProcedures } from '@/controllers/proceduresApi';
-import { fetchPatients, ensurePatient, recordPatientPhotoConsent } from '@/controllers/patientsApi';
+import { fetchPatients, ensurePatient, recordPatientPhotoConsent, checkPatientPhone } from '@/controllers/patientsApi';
 import type { Patient } from '@/data/mockData';
 import patientBeforeImg from '@/assets/patient-before.jpg';
 import {
@@ -26,6 +26,8 @@ import { storeEnhanceAfterImage, storeEnhanceMeta } from '@/lib/enhanceResultSto
 import { persistSimulationFlow } from '@/lib/simulationFlowStorage';
 import { buildEnhanceRegionsText } from '@/lib/enhanceProcedureRegions';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
+import { usePhoneReuseConfirmation } from '@/hooks/usePhoneReuseConfirmation';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { legalDocumentLinkProps } from '@legal/linkProps';
 import { cn } from '@/lib/utils';
@@ -95,8 +97,14 @@ const NewSimulation = () => {
   const [patientConsentAck, setPatientConsentAck] = useState(false);
   const [enhancePatientId, setEnhancePatientId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const phoneReuseConfirmedRef = useRef<string | null>(null);
   const navigate = useNavigate();
   const { user, refreshMe } = useAuth();
+  const { confirmIfPhoneExists, phoneReuseDialog } = usePhoneReuseConfirmation();
+  const [phoneConflictHint, setPhoneConflictHint] = useState<{
+    existingName: string;
+    simulationCount: number;
+  } | null>(null);
   const hasSimulationCredit = (user?.simulationCreditsRemaining ?? 0) > 0;
   const hasPreviewCredit = (user?.previewCreditsRemaining ?? 0) > 0;
   const flowLocked = !hasSimulationCredit;
@@ -105,6 +113,40 @@ const NewSimulation = () => {
   useEffect(() => {
     if (flowLocked) setStep(1);
   }, [flowLocked]);
+
+  useEffect(() => {
+    phoneReuseConfirmedRef.current = null;
+  }, [patientPhone, patientMode]);
+
+  useEffect(() => {
+    if (patientMode !== 'new' || step !== 1) {
+      setPhoneConflictHint(null);
+      return;
+    }
+    const digits = phoneDigitsOnly(patientPhone);
+    if (digits.length < 10) {
+      setPhoneConflictHint(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void checkPatientPhone(digits).then(({ exists, patient }) => {
+        if (cancelled) return;
+        if (exists && patient) {
+          setPhoneConflictHint({
+            existingName: patient.name,
+            simulationCount: patient.proceduresSimulated ?? 0,
+          });
+        } else {
+          setPhoneConflictHint(null);
+        }
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [patientPhone, patientMode, step]);
 
   const {
     data: clinicProcedures = [],
@@ -495,6 +537,20 @@ const NewSimulation = () => {
     );
   };
 
+  const handleAdvanceStep = async () => {
+    if (
+      step === 1 &&
+      patientMode === 'new' &&
+      phoneDigitsOnly(patientPhone) &&
+      phoneReuseConfirmedRef.current !== phoneDigitsOnly(patientPhone)
+    ) {
+      const phoneOk = await confirmIfPhoneExists(patientPhone, patientName);
+      if (!phoneOk) return;
+      phoneReuseConfirmedRef.current = phoneDigitsOnly(patientPhone);
+    }
+    setStep(step + 1);
+  };
+
   const resetToProfileSelection = () => {
     setPracticeProfile(null);
     setStep(1);
@@ -790,6 +846,30 @@ const NewSimulation = () => {
                       className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
+                  {phoneConflictHint && (
+                    <Alert className="sm:col-span-2 border-amber-500/60 bg-amber-500/10 text-foreground">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <AlertTitle className="text-amber-950 dark:text-amber-100">
+                        Telefone já cadastrado
+                      </AlertTitle>
+                      <AlertDescription className="text-amber-950/90 dark:text-amber-50/90">
+                        Este número pertence ao paciente{' '}
+                        <span className="font-medium">{phoneConflictHint.existingName}</span>
+                        {phoneConflictHint.simulationCount > 0 ? (
+                          <>
+                            {' '}
+                            ({phoneConflictHint.simulationCount}{' '}
+                            {phoneConflictHint.simulationCount === 1 ? 'simulação' : 'simulações'} no
+                            histórico)
+                          </>
+                        ) : null}
+                        . Se você continuar com{' '}
+                        <span className="font-medium">{patientName.trim() || 'outro nome'}</span>, as
+                        simulações serão agrupadas no mesmo cadastro — o que pode misturar históricos de
+                        pessoas diferentes. Ao clicar em Próximo, confirme se deseja seguir.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               )}
 
@@ -1268,7 +1348,7 @@ const NewSimulation = () => {
           {step < 5 && (
             <button
               type="button"
-              onClick={() => setStep(step + 1)}
+              onClick={() => void handleAdvanceStep()}
               disabled={
                 flowLocked ||
                 isGenerating ||
@@ -1296,6 +1376,8 @@ const NewSimulation = () => {
       </div>
         </>
       )}
+
+      {phoneReuseDialog}
 
       <style>{`
         @keyframes loading {
