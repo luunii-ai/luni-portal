@@ -28,6 +28,7 @@ import { buildEnhanceRegionsText } from '@/lib/enhanceProcedureRegions';
 import { formatBrazilPhoneInput, phoneDigitsOnly } from '@/lib/phoneFormat';
 import { usePhoneReuseConfirmation } from '@/hooks/usePhoneReuseConfirmation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { legalDocumentLinkProps } from '@legal/linkProps';
 import { cn } from '@/lib/utils';
@@ -1019,7 +1020,17 @@ const NewSimulation = () => {
                         </span>
                         <span className="text-2xl">{p.icon}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground">{p.name}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium text-foreground">{p.name}</p>
+                            {p.isNew && (
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 text-[10px] uppercase tracking-wide"
+                              >
+                                novo
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">{p.description}</p>
                         </div>
                       </div>

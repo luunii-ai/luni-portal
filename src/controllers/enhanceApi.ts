@@ -11,6 +11,7 @@ export const procedureIdToApiTipo: Record<string, string> = {
   nose: 'Rinomodelação',
   'bigode-chines': 'Bigode chinês (sulco nasogeniano)',
   mento: 'Preenchimento de mento (queixo)',
+  olheira: 'Preenchimento de olheira',
   ...plasticSurgeryProcedureApiTipoMap,
 };
 

@@ -44,6 +44,8 @@ export interface Procedure {
   practiceProfileScope?: 'clinic' | 'surgeon';
   /** Regiões anatômicas padrão em PT para o prompt (`regioes` na API enhance). */
   defaultEnhanceRegions?: string;
+  /** Badge "novo" no passo de seleção de procedimentos. */
+  isNew?: boolean;
 }
 
 export const botoxFacialPoints = [
