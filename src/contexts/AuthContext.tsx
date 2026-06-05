@@ -98,7 +98,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const u = await loginRequest(email, password);
+    await loginRequest(email, password);
+    const u = await fetchMe();
     const mapped = mapDto(u);
     setUser(mapped);
     return mapped;
