@@ -18,7 +18,8 @@ import {
   type SubscriptionPlanDto,
 } from '@/controllers/subscriptionApi';
 import { getApiErrorMessage } from '@/controllers/apiErrors';
-import { recurringBillingLabelPt } from '@/lib/subscriptionDisplayPt';
+import { computeYearlyPlanSavings, recurringBillingLabelPt } from '@/lib/subscriptionDisplayPt';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,7 +56,14 @@ function matchesPlanName(value: string, terms: string[]): boolean {
   return terms.some((term) => normalized.includes(normalizePlanText(term)));
 }
 
+/** Em produção o Pro fica “em breve”; em Stripe Test (pk_test_) permite testar o checkout local. */
+function isStripeTestPublishableKey(): boolean {
+  return publishableKey.startsWith('pk_test_');
+}
+
 function isProPlanUnavailable(plan: SubscriptionPlanDto): boolean {
+  if (import.meta.env.VITE_SUBSCRIPTION_UNLOCK_ALL_PLANS === 'true') return false;
+  if (isStripeTestPublishableKey()) return false;
   return matchesPlanName(plan.productName, ['pro', 'profissional']);
 }
 
@@ -88,7 +96,38 @@ function formatPlanMoney(amountCents: number | null, currency: string | null): s
   }).format((amountCents || 0) / 100);
 }
 
-export function PartnerSubscriptionCheckout() {
+function planIntervalSortKey(plan: SubscriptionPlanDto): number {
+  if (plan.interval === 'month') return 0;
+  if (plan.interval === 'year') return 1;
+  return 2;
+}
+
+function sortPlansForDisplay(plans: SubscriptionPlanDto[]): SubscriptionPlanDto[] {
+  return [...plans].sort((a, b) => {
+    const nameCmp = normalizePlanText(a.productName).localeCompare(normalizePlanText(b.productName), 'pt-BR');
+    if (nameCmp !== 0) return nameCmp;
+    return planIntervalSortKey(a) - planIntervalSortKey(b);
+  });
+}
+
+function monthlyPlanForProduct(
+  plans: SubscriptionPlanDto[],
+  plan: SubscriptionPlanDto,
+): SubscriptionPlanDto | undefined {
+  const key = normalizePlanText(plan.productName);
+  return plans.find(
+    (p) =>
+      p.interval === 'month' &&
+      !isProPlanUnavailable(p) &&
+      normalizePlanText(p.productName) === key,
+  );
+}
+
+type PartnerSubscriptionCheckoutProps = {
+  onProvisioned?: () => void;
+};
+
+export function PartnerSubscriptionCheckout({ onProvisioned }: PartnerSubscriptionCheckoutProps) {
   const { refreshMe } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
@@ -155,6 +194,7 @@ export function PartnerSubscriptionCheckout() {
           stopped = true;
           setProvisionPhase('done');
           await refreshMe();
+          onProvisioned?.();
           setSearchParams({}, { replace: true });
           return;
         }
@@ -175,7 +215,7 @@ export function PartnerSubscriptionCheckout() {
       stopped = true;
       if (intervalId) clearInterval(intervalId);
     };
-  }, [sessionId, refreshMe, setSearchParams]);
+  }, [sessionId, refreshMe, setSearchParams, onProvisioned]);
 
   useLayoutEffect(() => {
     if (!clientSecret || !publishableKey || !mountRef.current) return;
@@ -286,13 +326,18 @@ export function PartnerSubscriptionCheckout() {
             ) : plans.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum plano disponível no momento.</p>
             ) : (
-              plans.map((plan) => {
+              sortPlansForDisplay(plans).map((plan) => {
                 const amount = formatPlanMoney(plan.unitAmount, plan.currency);
                 const intervalLabel = recurringBillingLabelPt(plan.interval, plan.intervalCount ?? 1);
                 const suffix = intervalLabel ? ` / ${intervalLabel}` : '';
                 const locked = isProPlanUnavailable(plan);
                 const { blurb, features } = planMarketing(plan);
                 const selected = !locked && selectedPriceId === plan.id;
+                const isYearly = plan.interval === 'year';
+                const monthlyPair = isYearly ? monthlyPlanForProduct(plans, plan) : undefined;
+                const yearlySavings = isYearly
+                  ? computeYearlyPlanSavings(plan.unitAmount, monthlyPair?.unitAmount ?? null)
+                  : null;
                 return (
                   <label
                     key={plan.id}
@@ -303,11 +348,19 @@ export function PartnerSubscriptionCheckout() {
                         : selected
                           ? 'cursor-pointer border-primary bg-primary/5'
                           : 'cursor-pointer border-border',
+                      !locked && isYearly && yearlySavings && 'border-primary/25 bg-primary/[0.02]',
                     )}
                   >
                     {locked ? (
                       <span className="absolute -top-2.5 right-3 inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-sm">
                         Em breve
+                      </span>
+                    ) : null}
+                    {!locked && yearlySavings ? (
+                      <span className="absolute -top-2.5 right-3">
+                        <Badge className="text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                          Economize {yearlySavings.savingsPercent}%
+                        </Badge>
                       </span>
                     ) : null}
                     <input
@@ -330,10 +383,35 @@ export function PartnerSubscriptionCheckout() {
                         >
                           {plan.productName}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          {amount}
-                          {suffix}
-                        </p>
+                        <div className="space-y-1">
+                          {yearlySavings && monthlyPair ? (
+                            <>
+                              <p className="text-xs text-muted-foreground line-through">
+                                {formatPlanMoney(yearlySavings.annualAtMonthlyRateCents, plan.currency)}
+                                {suffix ? ` (${formatPlanMoney(monthlyPair.unitAmount, plan.currency)} × 12)` : ''}
+                              </p>
+                              <p className="text-sm font-semibold text-foreground">
+                                {amount}
+                                {suffix}
+                              </p>
+                              <p className="text-sm font-medium text-primary">
+                                Equivale a{' '}
+                                {formatPlanMoney(yearlySavings.equivalentMonthlyCents, plan.currency)}
+                                {' '}/ mês
+                              </p>
+                              <p className="text-xs font-medium text-primary">
+                                Economia de{' '}
+                                {formatPlanMoney(yearlySavings.savingsCents, plan.currency)} em relação ao
+                                plano mensal
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              {amount}
+                              {suffix}
+                            </p>
+                          )}
+                        </div>
                         <p className={cn('mt-1.5 text-sm leading-snug', locked && 'text-muted-foreground')}>
                           {blurb}
                         </p>

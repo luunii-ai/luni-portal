@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, ExternalLink, RefreshCcw } from 'lucide-react';
 import { createBillingPortalSession, fetchCurrentSubscription } from '@/controllers/subscriptionApi';
 import { getApiErrorMessage } from '@/controllers/apiErrors';
-import { recurringBillingLabelPt, subscriptionStatusLabelPt, shouldShowCurrentPeriodEnd, shouldShowTrialEnd } from '@/lib/subscriptionDisplayPt';
+import {
+  isActiveSubscriptionStatus,
+  recurringBillingLabelPt,
+  subscriptionStatusLabelPt,
+  shouldShowCurrentPeriodEnd,
+  shouldShowTrialEnd,
+} from '@/lib/subscriptionDisplayPt';
 import { useAuth } from '@/contexts/AuthContext';
 import { PartnerSubscriptionCheckout } from '@/components/PartnerSubscriptionCheckout';
 
@@ -27,6 +33,7 @@ const SubscriptionSettings = () => {
   const [loading, setLoading] = useState(true);
   const [openingPortal, setOpeningPortal] = useState(false);
   const [error, setError] = useState('');
+  const [provisionSuccess, setProvisionSuccess] = useState(false);
   const [subscription, setSubscription] = useState<Awaited<ReturnType<typeof fetchCurrentSubscription>> | null>(null);
 
   const refresh = async () => {
@@ -35,8 +42,18 @@ const SubscriptionSettings = () => {
     try {
       const current = await fetchCurrentSubscription();
       setSubscription(current);
+      if (current.hasSubscription || isActiveSubscriptionStatus(user?.subscriptionStatus)) {
+        setProvisionSuccess(false);
+      }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar a assinatura.'));
+      const msg = getApiErrorMessage(err, 'Não foi possível carregar a assinatura.');
+      const upgraded =
+        user?.accountType !== 'partner_test' || isActiveSubscriptionStatus(user?.subscriptionStatus);
+      if (upgraded && msg.includes('Período de teste encerrado')) {
+        setError('');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -44,7 +61,21 @@ const SubscriptionSettings = () => {
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [user?.id, user?.accountType, user?.subscriptionStatus]);
+
+  const handleProvisioned = () => {
+    setProvisionSuccess(true);
+    setError('');
+    void refresh();
+  };
+
+  const subscriptionActive =
+    subscription?.hasSubscription === true || isActiveSubscriptionStatus(user?.subscriptionStatus);
+  const effectiveStatus = subscription?.status || user?.subscriptionStatus;
+  const hideStalePartnerLockError =
+    Boolean(error) &&
+    error.includes('Período de teste encerrado') &&
+    (user?.accountType !== 'partner_test' || isActiveSubscriptionStatus(user?.subscriptionStatus));
 
   const planDescription = useMemo(() => {
     if (!subscription?.currentPrice) return 'Plano não identificado';
@@ -82,9 +113,18 @@ const SubscriptionSettings = () => {
         </button>
       </div>
 
-      {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive">{error}</div>}
+      {provisionSuccess && !subscriptionActive ? (
+        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-800 dark:text-emerald-100">
+          Pagamento confirmado. Estamos sincronizando sua assinatura — clique em Atualizar se o status não mudar em
+          alguns segundos.
+        </div>
+      ) : null}
 
-      {isPartner ? <PartnerSubscriptionCheckout /> : null}
+      {error && !hideStalePartnerLockError ? (
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive">{error}</div>
+      ) : null}
+
+      {isPartner ? <PartnerSubscriptionCheckout onProvisioned={handleProvisioned} /> : null}
 
       <div className="space-y-4 rounded-xl bg-card p-6 shadow-card">
         <h2 className="flex items-center gap-2 font-display font-semibold text-foreground">
@@ -99,7 +139,7 @@ const SubscriptionSettings = () => {
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
               <p className="text-sm font-medium text-foreground">
-                {subscriptionStatusLabelPt(subscription?.status)}
+                {subscriptionStatusLabelPt(effectiveStatus)}
               </p>
             </div>
             <div>
@@ -134,7 +174,7 @@ const SubscriptionSettings = () => {
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Assinatura ativa</p>
-              <p className="text-sm font-medium text-foreground">{subscription?.hasSubscription ? 'Sim' : 'Não'}</p>
+              <p className="text-sm font-medium text-foreground">{subscriptionActive ? 'Sim' : 'Não'}</p>
             </div>
           </div>
         )}

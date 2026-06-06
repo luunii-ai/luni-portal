@@ -144,4 +144,28 @@ export function recurringBillingLabelPt(
 
 }
 
+export interface YearlyPlanSavings {
+  savingsCents: number;
+  savingsPercent: number;
+  equivalentMonthlyCents: number;
+  annualAtMonthlyRateCents: number;
+}
+
+/** Compara preço anual com 12× o mensal do mesmo produto. */
+export function computeYearlyPlanSavings(
+  yearlyUnitAmount: number | null,
+  monthlyUnitAmount: number | null,
+): YearlyPlanSavings | null {
+  if (yearlyUnitAmount == null || monthlyUnitAmount == null) return null;
+  const annualAtMonthlyRate = monthlyUnitAmount * 12;
+  const savings = annualAtMonthlyRate - yearlyUnitAmount;
+  if (savings <= 0) return null;
+  return {
+    savingsCents: savings,
+    savingsPercent: Math.round((100 * savings) / annualAtMonthlyRate),
+    equivalentMonthlyCents: Math.round(yearlyUnitAmount / 12),
+    annualAtMonthlyRateCents: annualAtMonthlyRate,
+  };
+}
+
 
